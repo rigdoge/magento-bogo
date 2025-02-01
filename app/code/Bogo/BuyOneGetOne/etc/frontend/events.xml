@@ -5,8 +5,4 @@
         <observer name="bogo_buyonegetone_add_free_product" 
                   instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct" />
     </event>
-    <event name="sales_quote_save_before">
-        <observer name="bogo_buyonegetone_sync_quantities" 
-                  instance="Bogo\BuyOneGetOne\Observer\SyncQuantities" />
-    </event>
 </config> 
