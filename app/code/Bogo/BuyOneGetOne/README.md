@@ -16,6 +16,7 @@
 composer require bogo/module-buyonegetone
 ```
 
+
 2. 启用模块:
 ```bash
 php bin/magento module:enable Bogo_BuyOneGetOne
@@ -42,6 +43,9 @@ php bin/magento cache:flush
 ```bash
 rm -rf vendor/bogo
 composer remove bogo/module-buyonegetone
+rm -rf generated/*
+php bin/magento cache:clean
+php bin/magento cache:flush
 ```
 
 2. 清理系统:

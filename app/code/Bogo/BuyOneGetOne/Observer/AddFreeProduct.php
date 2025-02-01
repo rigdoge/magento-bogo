@@ -7,6 +7,7 @@ use Bogo\BuyOneGetOne\Helper\Data;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Quote\Model\Quote\ItemFactory;
 
 class AddFreeProduct implements ObserverInterface
 {
@@ -26,18 +27,26 @@ class AddFreeProduct implements ObserverInterface
     protected $messageManager;
 
     /**
+     * @var ItemFactory
+     */
+    protected $itemFactory;
+
+    /**
      * @param Data $helper
      * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
+     * @param ItemFactory $itemFactory
      */
     public function __construct(
         Data $helper,
         CheckoutSession $checkoutSession,
-        ManagerInterface $messageManager
+        ManagerInterface $messageManager,
+        ItemFactory $itemFactory
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
         $this->messageManager = $messageManager;
+        $this->itemFactory = $itemFactory;
     }
 
     /**
@@ -73,11 +82,15 @@ class AddFreeProduct implements ObserverInterface
 
             if ($existingFreeItem) {
                 // 如果已存在免费商品，更新数量
-                $existingFreeItem->setQty($item->getQty());
+                $existingFreeItem->setQty($item->getQty())
+                    ->setCustomPrice(0)
+                    ->setOriginalCustomPrice(0);
             } else {
                 // 创建新的免费商品
-                $freeItem = clone $item;
-                $freeItem->setQty($item->getQty())
+                $freeItem = $this->itemFactory->create();
+                $freeItem->setProduct($product)
+                    ->setQuote($quote)
+                    ->setQty($item->getQty())
                     ->setCustomPrice(0)
                     ->setOriginalCustomPrice(0)
                     ->setData('is_bogo_free', 1);

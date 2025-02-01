@@ -56,30 +56,46 @@ class SyncQuantities implements ObserverInterface
                 return;
             }
 
-            $items = $quote->getAllItems();
-            foreach ($items as $item) {
-                if (!$item->getData('is_bogo_free')) {
-                    continue;
-                }
+            $items = $quote->getAllVisibleItems();
+            $bogoItems = [];
 
+            // 首先收集所有买一送一商品
+            foreach ($items as $item) {
                 $product = $item->getProduct();
                 if (!$product || !$product->getData('buy_one_get_one')) {
                     continue;
                 }
 
-                // 查找对应的付费商品
-                foreach ($items as $paidItem) {
-                    if ($paidItem->getData('is_bogo_free')) {
-                        continue;
-                    }
+                $productId = $product->getId();
+                if (!isset($bogoItems[$productId])) {
+                    $bogoItems[$productId] = [
+                        'paid' => null,
+                        'free' => null
+                    ];
+                }
 
-                    if ($paidItem->getProduct()->getId() == $product->getId()) {
-                        // 同步数量
-                        $item->setQty($paidItem->getQty());
-                        break;
-                    }
+                if ($item->getData('is_bogo_free')) {
+                    $bogoItems[$productId]['free'] = $item;
+                } else {
+                    $bogoItems[$productId]['paid'] = $item;
                 }
             }
+
+            // 然后同步数量
+            foreach ($bogoItems as $items) {
+                if (!$items['paid'] || !$items['free']) {
+                    continue;
+                }
+
+                $paidQty = $items['paid']->getQty();
+                $freeQty = $items['free']->getQty();
+
+                if ($freeQty != $paidQty) {
+                    $items['free']->setQty($paidQty);
+                }
+            }
+
+            $quote->collectTotals();
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
