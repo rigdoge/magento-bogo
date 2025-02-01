@@ -80,15 +80,18 @@ class AddFreeProduct implements ObserverInterface
                 }
             }
 
+            // 获取当前付费商品的数量
+            $paidQty = $item->getQty();
+
             if ($existingFreeItem) {
-                // 更新现有免费商品的数量
-                $existingFreeItem->setQty($item->getQty());
+                // 直接设置免费商品数量等于付费商品数量
+                $existingFreeItem->setQty($paidQty);
             } else {
-                // 创建新的免费商品
+                // 创建新的免费商品，数量等于付费商品数量
                 $freeItem = $this->itemFactory->create();
                 $freeItem->setProduct($product)
                     ->setQuote($quote)
-                    ->setQty($item->getQty())
+                    ->setQty($paidQty)
                     ->setCustomPrice(0)
                     ->setOriginalCustomPrice(0)
                     ->setData('is_bogo_free', 1);
