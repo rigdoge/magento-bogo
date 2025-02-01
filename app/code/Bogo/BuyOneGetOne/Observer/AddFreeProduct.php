@@ -6,7 +6,7 @@ use Magento\Framework\Event\Observer;
 use Bogo\BuyOneGetOne\Helper\Data;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Message\ManagerInterface;
-use Magento\Quote\Model\Quote\Item\Factory as QuoteItemFactory;
+use Magento\Quote\Api\Data\CartItemInterfaceFactory;
 
 class AddFreeProduct implements ObserverInterface
 {
@@ -26,26 +26,26 @@ class AddFreeProduct implements ObserverInterface
     protected $messageManager;
 
     /**
-     * @var QuoteItemFactory
+     * @var CartItemInterfaceFactory
      */
-    protected $quoteItemFactory;
+    protected $cartItemFactory;
 
     /**
      * @param Data $helper
      * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
-     * @param QuoteItemFactory $quoteItemFactory
+     * @param CartItemInterfaceFactory $cartItemFactory
      */
     public function __construct(
         Data $helper,
         CheckoutSession $checkoutSession,
         ManagerInterface $messageManager,
-        QuoteItemFactory $quoteItemFactory
+        CartItemInterfaceFactory $cartItemFactory
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
         $this->messageManager = $messageManager;
-        $this->quoteItemFactory = $quoteItemFactory;
+        $this->cartItemFactory = $cartItemFactory;
     }
 
     /**
@@ -75,7 +75,7 @@ class AddFreeProduct implements ObserverInterface
             $quote = $this->checkoutSession->getQuote();
             
             // 创建免费商品
-            $freeItem = $this->quoteItemFactory->create();
+            $freeItem = $this->cartItemFactory->create();
             $freeItem->setProduct($product);
             $freeItem->setQty($item->getQty());
             $freeItem->setCustomPrice(0);
