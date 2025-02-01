@@ -68,7 +68,18 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            // 创建免费商品
+            $quote = $this->checkoutSession->getQuote();
+
+            // 先删除已存在的相同商品的免费项
+            foreach ($quote->getAllItems() as $quoteItem) {
+                if ($quoteItem->getProductId() == $product->getId() && 
+                    $quoteItem->getData('is_bogo_free') && 
+                    $quoteItem->getPrice() == 0) {
+                    $quote->removeItem($quoteItem->getId());
+                }
+            }
+
+            // 创建新的免费商品
             $freeItem = $this->itemFactory->create();
             $freeItem->setProduct($product);
             $freeItem->setQty($item->getQty());
@@ -76,8 +87,7 @@ class AddFreeProduct implements ObserverInterface
             $freeItem->setOriginalCustomPrice(0);
             $freeItem->setData('is_bogo_free', 1);
 
-            // 获取购物车并添加免费商品
-            $quote = $this->checkoutSession->getQuote();
+            // 添加新的免费商品
             $quote->addItem($freeItem);
             $quote->collectTotals();
             $quote->save();
