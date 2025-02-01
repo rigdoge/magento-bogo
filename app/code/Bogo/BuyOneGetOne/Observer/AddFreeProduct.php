@@ -61,13 +61,8 @@ class AddFreeProduct implements ObserverInterface
         $item = $observer->getEvent()->getData('quote_item');
         $product = $observer->getEvent()->getData('product');
 
-        // 检查是否已经是免费商品
-        if ($item->getPrice() == 0) {
-            return;
-        }
-
-        // 检查产品是否启用了买一送一功能
-        if (!$product->getBuyOneGetOne()) {
+        // 检查是否已经是免费商品或是否启用了买一送一功能
+        if ($item->getPrice() == 0 || !$product->getBuyOneGetOne()) {
             return;
         }
 
@@ -77,7 +72,7 @@ class AddFreeProduct implements ObserverInterface
 
             // 查找是否已存在相同产品的免费商品
             foreach ($quote->getAllItems() as $quoteItem) {
-                if ($quoteItem->getPrice() == 0 && 
+                if ($quoteItem->getData('is_bogo_free') && 
                     $quoteItem->getProduct()->getId() == $product->getId()) {
                     $existingFreeItem = $quoteItem;
                     break;
@@ -85,25 +80,17 @@ class AddFreeProduct implements ObserverInterface
             }
 
             if ($existingFreeItem) {
-                // 如果已存在免费商品，直接设置与付费商品相同的数量
-                $paidQty = 0;
-                // 计算所有付费商品的总数量
-                foreach ($quote->getAllItems() as $quoteItem) {
-                    if ($quoteItem->getPrice() > 0 && 
-                        $quoteItem->getProduct()->getId() == $product->getId()) {
-                        $paidQty += $quoteItem->getQty();
-                    }
-                }
-                $existingFreeItem->setQty($paidQty);
+                // 如果已存在免费商品，更新数量
+                $existingFreeItem->setQty($item->getQty());
             } else {
-                // 如果不存在，创建新的免费商品
+                // 创建新的免费商品
                 $freeItem = $this->cartItemFactory->create();
-                $freeItem->setProduct($product);
-                $freeItem->setQty($item->getQty());
-                $freeItem->setCustomPrice(0);
-                $freeItem->setOriginalCustomPrice(0);
-                // 添加标识，表明这是BOGO免费商品
-                $freeItem->setData('is_bogo_free', 1);
+                $freeItem->setProduct($product)
+                    ->setQty($item->getQty())
+                    ->setCustomPrice(0)
+                    ->setOriginalCustomPrice(0)
+                    ->setData('is_bogo_free', 1);
+                
                 $freeItem->getProduct()->setIsSuperMode(true);
                 $quote->addItem($freeItem);
             }

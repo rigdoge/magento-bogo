@@ -5,6 +5,7 @@ use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Event\Observer;
 use Bogo\BuyOneGetOne\Helper\Data;
 use Magento\Framework\Message\ManagerInterface;
+use Magento\Checkout\Model\Session as CheckoutSession;
 
 class SyncQuantities implements ObserverInterface
 {
@@ -19,15 +20,23 @@ class SyncQuantities implements ObserverInterface
     protected $messageManager;
 
     /**
+     * @var CheckoutSession
+     */
+    protected $checkoutSession;
+
+    /**
      * @param Data $helper
      * @param ManagerInterface $messageManager
+     * @param CheckoutSession $checkoutSession
      */
     public function __construct(
         Data $helper,
-        ManagerInterface $messageManager
+        ManagerInterface $messageManager,
+        CheckoutSession $checkoutSession
     ) {
         $this->helper = $helper;
         $this->messageManager = $messageManager;
+        $this->checkoutSession = $checkoutSession;
     }
 
     /**
@@ -42,7 +51,7 @@ class SyncQuantities implements ObserverInterface
 
         try {
             /** @var \Magento\Quote\Model\Quote $quote */
-            $quote = $observer->getEvent()->getQuote();
+            $quote = $this->checkoutSession->getQuote();
             if (!$quote) {
                 return;
             }
@@ -62,8 +71,8 @@ class SyncQuantities implements ObserverInterface
                     ];
                 }
 
-                // 根据价格区分付费和免费商品
-                if ($item->getCustomPrice() === 0.0 || $item->getPrice() == 0) {
+                // 根据标识区分付费和免费商品
+                if ($item->getData('is_bogo_free')) {
                     $bogoItems[$productId]['free'] = $item;
                 } else {
                     $bogoItems[$productId]['paid'] = $item;
@@ -81,6 +90,8 @@ class SyncQuantities implements ObserverInterface
                     $items['free']->setQty($paidQty);
                 }
             }
+
+            $quote->collectTotals()->save();
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to sync BOGO quantities.'));
         }
