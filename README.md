@@ -17,9 +17,79 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 
 ### Via Composer
 
+#### Install Stable Version
 ```bash
-composer require bogo/module-buyonegetone
+composer require bogo/module-buyonegetone:^1.0.0
+```
+
+#### Install Development Version
+```bash
+composer require bogo/module-buyonegetone:dev-develop
+```
+
+#### Post-Installation Steps
+```bash
 bin/magento module:enable Bogo_BuyOneGetOne
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+## Upgrade
+
+### Regular Upgrade
+```bash
+composer update bogo/module-buyonegetone
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+### Upgrade to Specific Version
+```bash
+composer require bogo/module-buyonegetone:1.0.x
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+### Switch to Development Version
+```bash
+composer require bogo/module-buyonegetone:dev-develop
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+## Uninstallation
+
+### Method 1: Remove via Composer
+```bash
+# Disable the module
+bin/magento module:disable Bogo_BuyOneGetOne
+
+# Remove the module
+composer remove bogo/module-buyonegetone
+
+# Clean up
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+### Method 2: Manual Cleanup
+```bash
+# Disable the module
+bin/magento module:disable Bogo_BuyOneGetOne
+
+# Remove module files
+rm -rf app/code/Bogo/BuyOneGetOne
+
+# Remove module from config
+rm -f app/etc/config.php
+bin/magento module:enable --all
+
+# Clean up
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento cache:clean
@@ -39,6 +109,28 @@ bin/magento cache:clean
 1. Edit a product in Admin > Catalog > Products
 2. Find "Enable Buy One Get One Free" under the Promotions tab
 3. Set to "Yes" to enable BOGO for the product
+
+## Troubleshooting
+
+### After Installation/Upgrade
+- Clear cache and generated files:
+  ```bash
+  rm -rf var/cache/* var/page_cache/* generated/*
+  bin/magento cache:clean
+  bin/magento cache:flush
+  ```
+- If you see 404 errors in admin:
+  ```bash
+  bin/magento setup:static-content:deploy
+  ```
+
+### After Uninstallation
+- If you experience any issues after uninstallation, clear all caches:
+  ```bash
+  rm -rf var/cache/* var/page_cache/* generated/*
+  bin/magento cache:clean
+  bin/magento cache:flush
+  ```
 
 ## Requirements
 
