@@ -86,9 +86,9 @@ class AddFreeProduct implements ObserverInterface
             $quote->addItem($freeItem);
             $quote->collectTotals()->save();
 
-            $this->messageManager->addSuccessMessage(__('Buy 1 get 1 free has been added to your cart!'));
+            $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
         } catch (\Exception $e) {
-            $this->messageManager->addErrorMessage(__('Could not add free product: %1', $e->getMessage()));
+            $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
         }
     }
 } 
