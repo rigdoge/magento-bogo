@@ -10,7 +10,8 @@
             "email": "support@bogo.com"
         }
     ],
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": "~8.2.0||~8.3.0",
         "magento/framework": "103.0.*",
