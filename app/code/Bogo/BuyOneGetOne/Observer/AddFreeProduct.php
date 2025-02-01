@@ -70,25 +70,30 @@ class AddFreeProduct implements ObserverInterface
 
             $quote = $this->checkoutSession->getQuote();
             $existingFreeItem = null;
-            $totalPaidQty = 0;
+            $paidItems = [];
 
-            // 计算已有的付费商品数量并查找免费商品
+            // 收集所有相同产品的付费商品和免费商品
             foreach ($quote->getAllItems() as $quoteItem) {
                 if ($quoteItem->getProduct()->getId() == $product->getId()) {
                     if ($quoteItem->getData('is_bogo_free')) {
                         $existingFreeItem = $quoteItem;
                     } else {
-                        $totalPaidQty += $quoteItem->getQty();
+                        $paidItems[] = $quoteItem;
                     }
                 }
             }
 
-            // 减去当前正在添加的商品数量（因为它还没有被计入quote中）
-            $totalPaidQty -= $item->getQty();
+            // 添加当前正在添加的商品
+            $paidItems[] = $item;
+
+            // 计算所有付费商品的总数量
+            $totalPaidQty = array_reduce($paidItems, function($carry, $item) {
+                return $carry + $item->getQty();
+            }, 0);
 
             if ($existingFreeItem) {
-                // 如果已存在免费商品，更新数量为所有付费商品的总数量
-                $existingFreeItem->setQty($totalPaidQty + $item->getQty())
+                // 如果已存在免费商品，更新数量
+                $existingFreeItem->setQty($item->getQty())
                     ->setCustomPrice(0)
                     ->setOriginalCustomPrice(0);
             } else {
@@ -96,7 +101,7 @@ class AddFreeProduct implements ObserverInterface
                 $freeItem = $this->itemFactory->create();
                 $freeItem->setProduct($product)
                     ->setQuote($quote)
-                    ->setQty($totalPaidQty + $item->getQty())
+                    ->setQty($item->getQty())
                     ->setCustomPrice(0)
                     ->setOriginalCustomPrice(0)
                     ->setData('is_bogo_free', 1);
