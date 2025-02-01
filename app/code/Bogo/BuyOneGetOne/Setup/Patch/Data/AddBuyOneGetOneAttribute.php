@@ -45,7 +45,7 @@ class AddBuyOneGetOneAttribute implements DataPatchInterface
             'input' => 'boolean',
             'source' => \Magento\Eav\Model\Entity\Attribute\Source\Boolean::class,
             'required' => false,
-            'sort_order' => 50,
+            'sort_order' => 10,
             'global' => ScopedAttributeInterface::SCOPE_STORE,
             'default' => '0',
             'visible' => true,
@@ -56,7 +56,10 @@ class AddBuyOneGetOneAttribute implements DataPatchInterface
             'visible_on_front' => false,
             'used_in_product_listing' => true,
             'unique' => false,
-            'group' => 'General'
+            'group' => 'Promotions',
+            'is_used_in_grid' => true,
+            'is_visible_in_grid' => true,
+            'is_filterable_in_grid' => true
         ]);
     }
 
