@@ -156,6 +156,26 @@ class AddFreeProduct implements ObserverInterface
     }
 
     /**
+     * Calculate total paid quantity for a product
+     *
+     * @param \Magento\Quote\Model\Quote $quote
+     * @param \Magento\Catalog\Model\Product $product
+     * @return float
+     */
+    private function getTotalPaidQuantity($quote, $product)
+    {
+        $totalQty = 0;
+        foreach ($quote->getAllItems() as $quoteItem) {
+            if ($quoteItem->getProductId() == $product->getId() && 
+                !$quoteItem->getData('is_bogo_free')
+            ) {
+                $totalQty += $quoteItem->getQty();
+            }
+        }
+        return $totalQty;
+    }
+
+    /**
      * Remove existing free items for the product
      *
      * @param \Magento\Quote\Model\Quote $quote
@@ -171,6 +191,7 @@ class AddFreeProduct implements ObserverInterface
                 $quote->removeItem($quoteItem->getId());
             }
         }
+        $quote->collectTotals();
     }
 
     /**
@@ -184,9 +205,18 @@ class AddFreeProduct implements ObserverInterface
     private function addFreeItem($quote, $product, $originalItem)
     {
         try {
+            // 计算所有付费商品的总数量
+            $totalPaidQty = $this->getTotalPaidQuantity($quote, $product);
+            
+            // 检查是否已经达到最大数量限制
+            $maxFreeItems = $this->helper->getMaxFreeItems();
+            if ($maxFreeItems > 0 && $totalPaidQty > $maxFreeItems) {
+                $totalPaidQty = $maxFreeItems;
+            }
+
             $freeItem = $this->itemFactory->create();
             $freeItem->setProduct($product)
-                ->setQty($originalItem->getQty())
+                ->setQty($totalPaidQty) // 设置与付费商品相同的总数量
                 ->setCustomPrice(0)
                 ->setOriginalCustomPrice(0)
                 ->setData('is_bogo_free', 1)
