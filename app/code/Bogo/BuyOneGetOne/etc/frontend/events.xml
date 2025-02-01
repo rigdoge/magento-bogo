@@ -13,4 +13,8 @@
         <observer name="bogo_buyonegetone_sync_items" 
                   instance="Bogo\BuyOneGetOne\Observer\SyncCartItems" />
     </event>
+    <event name="sales_quote_item_set_qty">
+        <observer name="bogo_buyonegetone_sync_qty" 
+                  instance="Bogo\BuyOneGetOne\Observer\SyncQuantity" />
+    </event>
 </config> 
