@@ -26,6 +26,13 @@ class SyncQuantities implements ObserverInterface
     protected $checkoutSession;
 
     /**
+     * Flag to prevent recursive calls
+     *
+     * @var bool
+     */
+    private static $isProcessing = false;
+
+    /**
      * @param Data $helper
      * @param ManagerInterface $messageManager
      * @param CheckoutSession $checkoutSession
@@ -46,13 +53,16 @@ class SyncQuantities implements ObserverInterface
      */
     public function execute(Observer $observer)
     {
-        if (!$this->helper->isEnabled()) {
+        if (!$this->helper->isEnabled() || self::$isProcessing) {
             return;
         }
 
         try {
+            self::$isProcessing = true;
+
             $quote = $this->checkoutSession->getQuote();
             if (!$quote) {
+                self::$isProcessing = false;
                 return;
             }
 
@@ -81,6 +91,7 @@ class SyncQuantities implements ObserverInterface
                 }
             }
 
+            $hasChanges = false;
             // 只在免费商品数量与付费商品数量不一致时同步
             foreach ($bogoItems as $items) {
                 if (!$items['paid'] || !$items['free']) {
@@ -92,13 +103,20 @@ class SyncQuantities implements ObserverInterface
 
                 if ($freeQty != $paidQty) {
                     $items['free']->setQty($paidQty);
-                    $quote->save(); // 保存更改
+                    $hasChanges = true;
                 }
+            }
+
+            // 只在有变化时保存
+            if ($hasChanges) {
+                $quote->collectTotals()->save();
             }
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to sync BOGO quantities.'));
+        } finally {
+            self::$isProcessing = false;
         }
     }
 } 

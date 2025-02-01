@@ -32,6 +32,13 @@ class AddFreeProduct implements ObserverInterface
     protected $itemFactory;
 
     /**
+     * Flag to prevent recursive calls
+     *
+     * @var bool
+     */
+    private static $isProcessing = false;
+
+    /**
      * @param Data $helper
      * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
@@ -55,17 +62,20 @@ class AddFreeProduct implements ObserverInterface
      */
     public function execute(Observer $observer)
     {
-        if (!$this->helper->isEnabled()) {
+        if (!$this->helper->isEnabled() || self::$isProcessing) {
             return;
         }
 
         try {
+            self::$isProcessing = true;
+            
             $item = $observer->getEvent()->getData('quote_item');
             $product = $observer->getEvent()->getData('product');
             $quote = $this->checkoutSession->getQuote();
 
             // 检查是否已经是免费商品或是否启用了买一送一功能
             if ($item->getPrice() == 0 || !$product->getData('buy_one_get_one')) {
+                self::$isProcessing = false;
                 return;
             }
 
@@ -106,6 +116,8 @@ class AddFreeProduct implements ObserverInterface
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
+        } finally {
+            self::$isProcessing = false;
         }
     }
 } 
