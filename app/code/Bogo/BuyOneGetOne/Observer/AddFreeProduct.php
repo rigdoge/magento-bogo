@@ -68,48 +68,18 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            $quote = $this->checkoutSession->getQuote();
-            $existingFreeItem = null;
-            $paidItems = [];
-
-            // 收集所有相同产品的付费商品和免费商品
-            foreach ($quote->getAllItems() as $quoteItem) {
-                if ($quoteItem->getProduct()->getId() == $product->getId()) {
-                    if ($quoteItem->getData('is_bogo_free')) {
-                        $existingFreeItem = $quoteItem;
-                    } else {
-                        $paidItems[] = $quoteItem;
-                    }
-                }
-            }
-
-            // 添加当前正在添加的商品
-            $paidItems[] = $item;
-
-            // 计算所有付费商品的总数量
-            $totalPaidQty = array_reduce($paidItems, function($carry, $item) {
-                return $carry + $item->getQty();
-            }, 0);
-
-            if ($existingFreeItem) {
-                // 如果已存在免费商品，更新数量
-                $existingFreeItem->setQty($item->getQty())
-                    ->setCustomPrice(0)
-                    ->setOriginalCustomPrice(0);
-            } else {
-                // 创建新的免费商品
-                $freeItem = $this->itemFactory->create();
-                $freeItem->setProduct($product)
-                    ->setQuote($quote)
-                    ->setQty($item->getQty())
-                    ->setCustomPrice(0)
-                    ->setOriginalCustomPrice(0)
-                    ->setData('is_bogo_free', 1);
-                
-                $quote->addItem($freeItem);
-            }
-
-            $quote->collectTotals()->save();
+            // 创建新的免费商品
+            $freeItem = $this->itemFactory->create();
+            $freeItem->setProduct($product)
+                ->setQuote($this->checkoutSession->getQuote())
+                ->setQty($item->getQty())
+                ->setCustomPrice(0)
+                ->setOriginalCustomPrice(0)
+                ->setData('is_bogo_free', 1);
+            
+            $this->checkoutSession->getQuote()->addItem($freeItem);
+            $this->checkoutSession->getQuote()->collectTotals()->save();
+            
             $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
