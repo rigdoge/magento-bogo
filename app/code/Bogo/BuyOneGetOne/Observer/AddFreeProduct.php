@@ -60,28 +60,27 @@ class AddFreeProduct implements ObserverInterface
         }
 
         try {
-            $quoteItem = $observer->getEvent()->getData('quote_item');
-            if (!$quoteItem) {
-                return;
-            }
+            $item = $observer->getEvent()->getData('quote_item');
+            $product = $observer->getEvent()->getData('product');
 
             // 如果是免费商品或没有启用买一送一，直接返回
-            if ($quoteItem->getData('is_bogo_free') || 
-                $quoteItem->getPrice() == 0 || 
-                !$quoteItem->getProduct()->getData('buy_one_get_one')) {
+            if ($item->getPrice() == 0 || !$product->getData('buy_one_get_one')) {
                 return;
             }
 
             // 创建免费商品
             $freeItem = $this->itemFactory->create();
-            $freeItem->setProduct($quoteItem->getProduct())
-                ->setQuote($quoteItem->getQuote())
-                ->setQty($quoteItem->getQty())
-                ->setCustomPrice(0)
-                ->setOriginalCustomPrice(0)
-                ->setData('is_bogo_free', 1);
-            
-            $quoteItem->getQuote()->addItem($freeItem);
+            $freeItem->setProduct($product);
+            $freeItem->setQty($item->getQty());
+            $freeItem->setCustomPrice(0);
+            $freeItem->setOriginalCustomPrice(0);
+            $freeItem->setData('is_bogo_free', 1);
+
+            // 获取购物车并添加免费商品
+            $quote = $this->checkoutSession->getQuote();
+            $quote->addItem($freeItem);
+            $quote->collectTotals();
+            $quote->save();
             
             $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
         } catch (LocalizedException $e) {
