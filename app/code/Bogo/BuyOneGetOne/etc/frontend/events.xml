@@ -5,8 +5,12 @@
         <observer name="bogo_buyonegetone_add_free_product" 
                   instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct" />
     </event>
-    <event name="sales_quote_item_qty_set_after">
-        <observer name="bogo_buyonegetone_update_free_product" 
-                  instance="Bogo\BuyOneGetOne\Observer\UpdateFreeProduct" />
+    <event name="checkout_cart_update_items_before">
+        <observer name="bogo_buyonegetone_update_items" 
+                  instance="Bogo\BuyOneGetOne\Observer\UpdateCartItems" />
+    </event>
+    <event name="checkout_cart_update_items_after">
+        <observer name="bogo_buyonegetone_sync_items" 
+                  instance="Bogo\BuyOneGetOne\Observer\SyncCartItems" />
     </event>
 </config> 
