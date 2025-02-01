@@ -10,6 +10,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Quote\Model\Quote\ItemFactory;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
+use Magento\Catalog\Model\ProductRepository;
 
 class AddFreeProduct implements ObserverInterface
 {
@@ -44,12 +45,25 @@ class AddFreeProduct implements ObserverInterface
     protected $priceHelper;
 
     /**
+     * @var ProductRepository
+     */
+    protected $productRepository;
+
+    /**
+     * Flag to prevent recursive calls
+     *
+     * @var bool
+     */
+    private static $isProcessing = false;
+
+    /**
      * @param Data $helper
      * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
      * @param ItemFactory $itemFactory
      * @param StockRegistryInterface $stockRegistry
      * @param PricingHelper $priceHelper
+     * @param ProductRepository $productRepository
      */
     public function __construct(
         Data $helper,
@@ -57,7 +71,8 @@ class AddFreeProduct implements ObserverInterface
         ManagerInterface $messageManager,
         ItemFactory $itemFactory,
         StockRegistryInterface $stockRegistry,
-        PricingHelper $priceHelper
+        PricingHelper $priceHelper,
+        ProductRepository $productRepository
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
@@ -65,6 +80,7 @@ class AddFreeProduct implements ObserverInterface
         $this->itemFactory = $itemFactory;
         $this->stockRegistry = $stockRegistry;
         $this->priceHelper = $priceHelper;
+        $this->productRepository = $productRepository;
     }
 
     /**
@@ -74,16 +90,33 @@ class AddFreeProduct implements ObserverInterface
      */
     public function execute(Observer $observer)
     {
-        if (!$this->helper->isEnabled()) {
+        if (!$this->helper->isEnabled() || self::$isProcessing) {
             return;
         }
 
         try {
+            self::$isProcessing = true;
+
             $item = $observer->getEvent()->getData('quote_item');
-            $product = $observer->getEvent()->getData('product');
+            if (!$item) {
+                return;
+            }
+
+            $product = $this->productRepository->getById($item->getProductId());
+            if (!$product) {
+                return;
+            }
 
             // 检查是否是免费商品或没有启用买一送一
-            if ($item->getPrice() == 0 || !$product->getData('buy_one_get_one')) {
+            if ($item->getPrice() == 0 || 
+                $item->getData('is_bogo_free') || 
+                !$product->getData('buy_one_get_one')
+            ) {
+                return;
+            }
+
+            $quote = $this->checkoutSession->getQuote();
+            if (!$quote || !$quote->getId()) {
                 return;
             }
 
@@ -92,8 +125,6 @@ class AddFreeProduct implements ObserverInterface
             if (!$stockItem->getIsInStock() || $stockItem->getQty() < ($item->getQty() * 2)) {
                 throw new LocalizedException(__('Not enough stock available for BOGO offer.'));
             }
-
-            $quote = $this->checkoutSession->getQuote();
 
             // 检查是否达到最大免费商品数量限制
             if ($this->helper->hasReachedMaxFreeItems($product->getId(), $quote)) {
@@ -114,10 +145,13 @@ class AddFreeProduct implements ObserverInterface
                     $formattedPrice
                 )
             );
+
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
+        } finally {
+            self::$isProcessing = false;
         }
     }
 
@@ -132,8 +166,8 @@ class AddFreeProduct implements ObserverInterface
     {
         foreach ($quote->getAllItems() as $quoteItem) {
             if ($quoteItem->getProductId() == $product->getId() && 
-                $quoteItem->getData('is_bogo_free') && 
-                $quoteItem->getPrice() == 0) {
+                $quoteItem->getData('is_bogo_free')
+            ) {
                 $quote->removeItem($quoteItem->getId());
             }
         }
@@ -149,16 +183,28 @@ class AddFreeProduct implements ObserverInterface
      */
     private function addFreeItem($quote, $product, $originalItem)
     {
-        $freeItem = $this->itemFactory->create();
-        $freeItem->setProduct($product)
-            ->setQty($originalItem->getQty())
-            ->setCustomPrice(0)
-            ->setOriginalCustomPrice(0)
-            ->setData('is_bogo_free', 1)
-            ->setData('original_item_id', $originalItem->getId());
+        try {
+            $freeItem = $this->itemFactory->create();
+            $freeItem->setProduct($product)
+                ->setQty($originalItem->getQty())
+                ->setCustomPrice(0)
+                ->setOriginalCustomPrice(0)
+                ->setData('is_bogo_free', 1)
+                ->setData('original_item_id', $originalItem->getId())
+                ->setData('no_discount', 1); // 防止其他折扣应用到免费商品
 
-        $quote->addItem($freeItem);
-        $quote->collectTotals();
-        $quote->save();
+            $quote->addItem($freeItem);
+
+            // 确保价格为0
+            $freeItem->setPrice(0)
+                ->setBasePrice(0)
+                ->setPriceInclTax(0)
+                ->setBasePriceInclTax(0);
+
+            $quote->collectTotals();
+            $quote->save();
+        } catch (\Exception $e) {
+            throw new LocalizedException(__('Error adding free item: %1', $e->getMessage()));
+        }
     }
 } 
