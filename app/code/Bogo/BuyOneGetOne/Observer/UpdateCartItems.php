@@ -53,56 +53,25 @@ class UpdateCartItems implements ObserverInterface
             $cart = $observer->getEvent()->getCart();
             $data = $observer->getEvent()->getInfo();
             $quote = $cart->getQuote();
-            $itemsToUpdate = [];
-
-            // 首先收集所有需要更新的项目
-            foreach ($data as $itemId => $itemInfo) {
-                $item = $quote->getItemById($itemId);
-                if (!$item || !isset($itemInfo['qty'])) {
-                    continue;
-                }
-
+            
+            // 遍历所有购物车项目
+            foreach ($quote->getAllItems() as $item) {
                 $product = $item->getProduct();
                 if (!$product->getBuyOneGetOne()) {
                     continue;
                 }
 
-                $qty = (float)$itemInfo['qty'];
-                
-                // 将相同产品的付费和免费商品分组
-                $productId = $product->getId();
-                if (!isset($itemsToUpdate[$productId])) {
-                    $itemsToUpdate[$productId] = [
-                        'paid' => null,
-                        'free' => null,
-                        'qty' => 0
-                    ];
-                }
+                // 找到当前项目的新数量
+                $newQty = isset($data[$item->getId()]['qty']) ? (float)$data[$item->getId()]['qty'] : $item->getQty();
 
-                if ($item->getPrice() > 0) {
-                    $itemsToUpdate[$productId]['paid'] = $item;
-                    $itemsToUpdate[$productId]['qty'] = $qty;
-                } else {
-                    $itemsToUpdate[$productId]['free'] = $item;
-                }
-            }
-
-            // 查找并更新配对的商品
-            foreach ($quote->getAllItems() as $item) {
-                $productId = $item->getProduct()->getId();
-                if (!isset($itemsToUpdate[$productId])) {
-                    continue;
-                }
-
-                $updateInfo = $itemsToUpdate[$productId];
-                
-                // 如果是付费商品被更新，找到对应的免费商品
-                if ($item->getPrice() == 0 && $updateInfo['paid']) {
-                    $item->setQty($updateInfo['qty']);
-                }
-                // 如果是免费商品被更新，找到对应的付费商品
-                elseif ($item->getPrice() > 0 && $updateInfo['free']) {
-                    $item->setQty($updateInfo['qty']);
+                // 查找相关联的商品（付费或免费）
+                foreach ($quote->getAllItems() as $relatedItem) {
+                    if ($relatedItem->getProduct()->getId() == $product->getId() && 
+                        $relatedItem->getId() != $item->getId()) {
+                        // 直接设置相同的数量
+                        $relatedItem->setQty($newQty);
+                        break;
+                    }
                 }
             }
 
