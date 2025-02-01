@@ -3,7 +3,7 @@
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
         <tab id="bogo" translate="label" sortOrder="999">
-            <label>Bogo Extensions</label>
+            <label>Papa BOGO Extensions</label>
         </tab>
         <section id="buyonegetone" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Buy One Get One Free</label>
