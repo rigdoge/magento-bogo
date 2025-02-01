@@ -79,39 +79,37 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            // 检查是否已存在相同产品的免费商品
-            $existingFreeItem = null;
+            // 删除所有已存在的相同产品的免费商品
+            $itemsToRemove = [];
             foreach ($quote->getAllItems() as $quoteItem) {
                 if ($quoteItem->getProductId() == $product->getId() 
                     && $quoteItem->getData('is_bogo_free')
                     && $quoteItem->getPrice() == 0) {
-                    $existingFreeItem = $quoteItem;
-                    break;
+                    $itemsToRemove[] = $quoteItem;
                 }
             }
-
-            // 获取当前付费商品的数量
-            $paidQty = $item->getQty();
-
-            if ($existingFreeItem) {
-                // 直接设置免费商品数量等于付费商品数量
-                $existingFreeItem->setQty($paidQty);
-            } else {
-                // 创建新的免费商品，数量等于付费商品数量
-                $freeItem = $this->itemFactory->create();
-                $freeItem->setProduct($product)
-                    ->setQuote($quote)
-                    ->setQty($paidQty)
-                    ->setCustomPrice(0)
-                    ->setOriginalCustomPrice(0)
-                    ->setData('is_bogo_free', 1);
-                
-                $quote->addItem($freeItem);
-            }
             
+            foreach ($itemsToRemove as $itemToRemove) {
+                $quote->removeItem($itemToRemove->getId());
+            }
+
+            // 创建新的免费商品
+            $freeItem = $this->itemFactory->create();
+            $freeItem->setProduct($product)
+                ->setQuote($quote)
+                ->setQty($item->getQty())
+                ->setCustomPrice(0)
+                ->setOriginalCustomPrice(0)
+                ->setData('is_bogo_free', 1);
+            
+            $quote->addItem($freeItem);
             $quote->collectTotals()->save();
             
-            $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
+            if (!empty($itemsToRemove)) {
+                $this->messageManager->addSuccessMessage(__('BOGO offer updated: Your free item quantity has been updated!'));
+            } else {
+                $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
+            }
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
