@@ -81,7 +81,7 @@ class SyncQuantities implements ObserverInterface
                 }
             }
 
-            // 然后同步数量
+            // 只在免费商品数量与付费商品数量不一致时同步
             foreach ($bogoItems as $items) {
                 if (!$items['paid'] || !$items['free']) {
                     continue;
@@ -92,10 +92,9 @@ class SyncQuantities implements ObserverInterface
 
                 if ($freeQty != $paidQty) {
                     $items['free']->setQty($paidQty);
+                    $quote->save(); // 保存更改
                 }
             }
-
-            $quote->collectTotals();
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
