@@ -62,7 +62,7 @@ class AddFreeProduct implements ObserverInterface
         $product = $observer->getEvent()->getData('product');
 
         // 检查是否已经是免费商品或是否启用了买一送一功能
-        if ($item->getPrice() == 0 || !$product->getBuyOneGetOne()) {
+        if ($item->getPrice() == 0 || !$product->getData('buy_one_get_one')) {
             return;
         }
 

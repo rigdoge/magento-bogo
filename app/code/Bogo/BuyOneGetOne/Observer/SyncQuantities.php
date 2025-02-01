@@ -59,7 +59,7 @@ class SyncQuantities implements ObserverInterface
             $bogoItems = [];
             // 收集所有买一送一商品
             foreach ($quote->getAllItems() as $item) {
-                if (!$item->getProduct()->getBuyOneGetOne()) {
+                if (!$item->getProduct()->getData('buy_one_get_one')) {
                     continue;
                 }
 
