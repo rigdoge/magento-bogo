@@ -62,38 +62,21 @@ class AddFreeProduct implements ObserverInterface
      */
     public function execute(Observer $observer)
     {
-        if (!$this->helper->isEnabled() || self::$isProcessing) {
+        if (!$this->helper->isEnabled()) {
             return;
         }
 
         try {
-            self::$isProcessing = true;
-            
             $item = $observer->getEvent()->getData('quote_item');
             $product = $observer->getEvent()->getData('product');
             $quote = $this->checkoutSession->getQuote();
 
-            // 检查是否已经是免费商品或是否启用了买一送一功能
+            // 如果是免费商品或没有启用买一送一，直接返回
             if ($item->getPrice() == 0 || !$product->getData('buy_one_get_one')) {
-                self::$isProcessing = false;
                 return;
             }
 
-            // 删除所有已存在的相同产品的免费商品
-            $itemsToRemove = [];
-            foreach ($quote->getAllItems() as $quoteItem) {
-                if ($quoteItem->getProductId() == $product->getId() 
-                    && $quoteItem->getData('is_bogo_free')
-                    && $quoteItem->getPrice() == 0) {
-                    $itemsToRemove[] = $quoteItem;
-                }
-            }
-            
-            foreach ($itemsToRemove as $itemToRemove) {
-                $quote->removeItem($itemToRemove->getId());
-            }
-
-            // 创建新的免费商品
+            // 直接创建一个免费商品
             $freeItem = $this->itemFactory->create();
             $freeItem->setProduct($product)
                 ->setQuote($quote)
@@ -103,19 +86,13 @@ class AddFreeProduct implements ObserverInterface
                 ->setData('is_bogo_free', 1);
             
             $quote->addItem($freeItem);
-            $quote->collectTotals()->save();
+            $quote->save();
             
-            if (!empty($itemsToRemove)) {
-                $this->messageManager->addSuccessMessage(__('BOGO offer updated: Your free item quantity has been updated!'));
-            } else {
-                $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
-            }
+            $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
         } catch (LocalizedException $e) {
             $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
-        } finally {
-            self::$isProcessing = false;
         }
     }
 } 
