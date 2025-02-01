@@ -49,63 +49,67 @@ class UpdateCartItems implements ObserverInterface
             return;
         }
 
-        $cart = $observer->getEvent()->getCart();
-        $data = $observer->getEvent()->getInfo();
+        try {
+            $cart = $observer->getEvent()->getCart();
+            $data = $observer->getEvent()->getInfo();
+            $quote = $cart->getQuote();
+            $itemsToUpdate = [];
 
-        foreach ($data as $itemId => $itemInfo) {
-            $item = $cart->getQuote()->getItemById($itemId);
-            if (!$item) {
-                continue;
+            // 首先收集所有需要更新的项目
+            foreach ($data as $itemId => $itemInfo) {
+                $item = $quote->getItemById($itemId);
+                if (!$item || !isset($itemInfo['qty'])) {
+                    continue;
+                }
+
+                $product = $item->getProduct();
+                if (!$product->getBuyOneGetOne()) {
+                    continue;
+                }
+
+                $qty = (float)$itemInfo['qty'];
+                
+                // 将相同产品的付费和免费商品分组
+                $productId = $product->getId();
+                if (!isset($itemsToUpdate[$productId])) {
+                    $itemsToUpdate[$productId] = [
+                        'paid' => null,
+                        'free' => null,
+                        'qty' => 0
+                    ];
+                }
+
+                if ($item->getPrice() > 0) {
+                    $itemsToUpdate[$productId]['paid'] = $item;
+                    $itemsToUpdate[$productId]['qty'] = $qty;
+                } else {
+                    $itemsToUpdate[$productId]['free'] = $item;
+                }
             }
 
-            $product = $item->getProduct();
-            if (!$product->getBuyOneGetOne()) {
-                continue;
+            // 查找并更新配对的商品
+            foreach ($quote->getAllItems() as $item) {
+                $productId = $item->getProduct()->getId();
+                if (!isset($itemsToUpdate[$productId])) {
+                    continue;
+                }
+
+                $updateInfo = $itemsToUpdate[$productId];
+                
+                // 如果是付费商品被更新，找到对应的免费商品
+                if ($item->getPrice() == 0 && $updateInfo['paid']) {
+                    $item->setQty($updateInfo['qty']);
+                }
+                // 如果是免费商品被更新，找到对应的付费商品
+                elseif ($item->getPrice() > 0 && $updateInfo['free']) {
+                    $item->setQty($updateInfo['qty']);
+                }
             }
 
-            $qty = isset($itemInfo['qty']) ? (float)$itemInfo['qty'] : 0;
-            if ($qty <= 0) {
-                continue;
-            }
-
-            // 如果是付费商品，同步更新免费商品
-            if ($item->getPrice() > 0) {
-                $this->updateFreeItem($cart->getQuote(), $item, $qty);
-            }
-            // 如果是免费商品，同步更新付费商品
-            else {
-                $this->updatePaidItem($cart->getQuote(), $item, $qty);
-            }
-        }
-    }
-
-    /**
-     * 更新免费商品数量
-     */
-    private function updateFreeItem($quote, $paidItem, $qty)
-    {
-        foreach ($quote->getAllItems() as $item) {
-            if ($item->getPrice() == 0 && 
-                $item->getProduct()->getId() == $paidItem->getProduct()->getId() &&
-                $item->getId() != $paidItem->getId()) {
-                $item->setQty($qty);
-                break;
-            }
-        }
-    }
-
-    /**
-     * 更新付费商品数量
-     */
-    private function updatePaidItem($quote, $freeItem, $qty)
-    {
-        foreach ($quote->getAllItems() as $item) {
-            if ($item->getPrice() > 0 && 
-                $item->getProduct()->getId() == $freeItem->getProduct()->getId() &&
-                $item->getId() != $freeItem->getId()) {
-                $item->setQty($qty);
-                break;
-            }
+            // 保存更改
+            $quote->collectTotals();
+        } catch (\Exception $e) {
+            $this->messageManager->addErrorMessage(__('Unable to update BOGO quantities. Please try again.'));
         }
     }
 } 
