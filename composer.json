@@ -25,5 +25,11 @@
         "psr-4": {
             "Bogo\\BuyOneGetOne\\": "app/code/Bogo/BuyOneGetOne"
         }
+    },
+    "repositories": {
+        "bogo": {
+            "type": "vcs",
+            "url": "https://github.com/rigdoge/magento-bogo.git"
+        }
     }
-} 
+}

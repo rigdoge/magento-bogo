@@ -4,8 +4,9 @@ namespace Bogo\BuyOneGetOne\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Event\Observer;
 use Bogo\BuyOneGetOne\Helper\Data;
-use Magento\Checkout\Model\Cart;
+use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Message\ManagerInterface;
+use Magento\Quote\Model\Quote\Item\Factory as QuoteItemFactory;
 
 class AddFreeProduct implements ObserverInterface
 {
@@ -15,9 +16,9 @@ class AddFreeProduct implements ObserverInterface
     protected $helper;
 
     /**
-     * @var Cart
+     * @var CheckoutSession
      */
-    protected $cart;
+    protected $checkoutSession;
 
     /**
      * @var ManagerInterface
@@ -25,18 +26,26 @@ class AddFreeProduct implements ObserverInterface
     protected $messageManager;
 
     /**
+     * @var QuoteItemFactory
+     */
+    protected $quoteItemFactory;
+
+    /**
      * @param Data $helper
-     * @param Cart $cart
+     * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
+     * @param QuoteItemFactory $quoteItemFactory
      */
     public function __construct(
         Data $helper,
-        Cart $cart,
-        ManagerInterface $messageManager
+        CheckoutSession $checkoutSession,
+        ManagerInterface $messageManager,
+        QuoteItemFactory $quoteItemFactory
     ) {
         $this->helper = $helper;
-        $this->cart = $cart;
+        $this->checkoutSession = $checkoutSession;
         $this->messageManager = $messageManager;
+        $this->quoteItemFactory = $quoteItemFactory;
     }
 
     /**
@@ -58,15 +67,19 @@ class AddFreeProduct implements ObserverInterface
         }
 
         try {
+            $quote = $this->checkoutSession->getQuote();
+            
             // 创建免费商品
-            $freeItem = clone $item;
+            $freeItem = $this->quoteItemFactory->create();
+            $freeItem->setProduct($product);
+            $freeItem->setQty($item->getQty());
             $freeItem->setCustomPrice(0);
             $freeItem->setOriginalCustomPrice(0);
             $freeItem->getProduct()->setIsSuperMode(true);
             
             // 添加到购物车
-            $this->cart->addItem($freeItem);
-            $this->cart->save();
+            $quote->addItem($freeItem);
+            $quote->collectTotals()->save();
 
             $this->messageManager->addSuccessMessage(__('Free product has been added to your cart!'));
         } catch (\Exception $e) {
