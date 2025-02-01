@@ -73,19 +73,33 @@ class AddFreeProduct implements ObserverInterface
 
         try {
             $quote = $this->checkoutSession->getQuote();
-            
-            // 创建免费商品
-            $freeItem = $this->cartItemFactory->create();
-            $freeItem->setProduct($product);
-            $freeItem->setQty($item->getQty());
-            $freeItem->setCustomPrice(0);
-            $freeItem->setOriginalCustomPrice(0);
-            $freeItem->getProduct()->setIsSuperMode(true);
-            
-            // 添加到购物车
-            $quote->addItem($freeItem);
-            $quote->collectTotals()->save();
+            $existingFreeItem = null;
 
+            // 查找是否已存在相同产品的免费商品
+            foreach ($quote->getAllItems() as $quoteItem) {
+                if ($quoteItem->getPrice() == 0 && 
+                    $quoteItem->getProduct()->getId() == $product->getId()) {
+                    $existingFreeItem = $quoteItem;
+                    break;
+                }
+            }
+
+            if ($existingFreeItem) {
+                // 如果已存在免费商品，更新其数量
+                $newQty = $existingFreeItem->getQty() + $item->getQty();
+                $existingFreeItem->setQty($newQty);
+            } else {
+                // 如果不存在，创建新的免费商品
+                $freeItem = $this->cartItemFactory->create();
+                $freeItem->setProduct($product);
+                $freeItem->setQty($item->getQty());
+                $freeItem->setCustomPrice(0);
+                $freeItem->setOriginalCustomPrice(0);
+                $freeItem->getProduct()->setIsSuperMode(true);
+                $quote->addItem($freeItem);
+            }
+
+            $quote->collectTotals()->save();
             $this->messageManager->addSuccessMessage(__('BOGO offer applied: Your free item has been added!'));
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
