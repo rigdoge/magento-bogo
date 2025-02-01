@@ -66,6 +66,11 @@ class AddFreeProduct implements ObserverInterface
             return;
         }
 
+        // 检查产品是否启用了买一送一功能
+        if (!$product->getBuyOneGetOne()) {
+            return;
+        }
+
         try {
             $quote = $this->checkoutSession->getQuote();
             
