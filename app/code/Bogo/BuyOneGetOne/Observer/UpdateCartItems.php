@@ -54,29 +54,51 @@ class UpdateCartItems implements ObserverInterface
             $data = $observer->getEvent()->getInfo();
             $quote = $cart->getQuote();
             
-            // 遍历所有购物车项目
+            // 收集所有买一送一商品的信息
+            $bogoItems = [];
             foreach ($quote->getAllItems() as $item) {
                 $product = $item->getProduct();
                 if (!$product->getBuyOneGetOne()) {
                     continue;
                 }
 
-                // 找到当前项目的新数量
-                $newQty = isset($data[$item->getId()]['qty']) ? (float)$data[$item->getId()]['qty'] : $item->getQty();
+                $productId = $product->getId();
+                if (!isset($bogoItems[$productId])) {
+                    $bogoItems[$productId] = [
+                        'paid' => null,
+                        'free' => null,
+                        'new_qty' => 0
+                    ];
+                }
 
-                // 查找相关联的商品（付费或免费）
-                foreach ($quote->getAllItems() as $relatedItem) {
-                    if ($relatedItem->getProduct()->getId() == $product->getId() && 
-                        $relatedItem->getId() != $item->getId()) {
-                        // 直接设置相同的数量
-                        $relatedItem->setQty($newQty);
-                        break;
+                // 记录商品信息
+                if ($item->getPrice() > 0) {
+                    $bogoItems[$productId]['paid'] = $item;
+                    // 如果这个商品在更新数据中，使用新数量
+                    if (isset($data[$item->getId()]['qty'])) {
+                        $bogoItems[$productId]['new_qty'] = (float)$data[$item->getId()]['qty'];
+                    } else {
+                        $bogoItems[$productId]['new_qty'] = $item->getQty();
+                    }
+                } else {
+                    $bogoItems[$productId]['free'] = $item;
+                    // 如果免费商品在更新数据中，使用新数量
+                    if (isset($data[$item->getId()]['qty'])) {
+                        $bogoItems[$productId]['new_qty'] = (float)$data[$item->getId()]['qty'];
                     }
                 }
             }
 
+            // 同步数量
+            foreach ($bogoItems as $items) {
+                if ($items['paid'] && $items['free']) {
+                    $items['paid']->setQty($items['new_qty']);
+                    $items['free']->setQty($items['new_qty']);
+                }
+            }
+
             // 保存更改
-            $quote->collectTotals();
+            $quote->collectTotals()->save();
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to update BOGO quantities. Please try again.'));
         }
