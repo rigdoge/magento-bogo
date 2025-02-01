@@ -32,13 +32,6 @@ class AddFreeProduct implements ObserverInterface
     protected $itemFactory;
 
     /**
-     * Flag to prevent recursive calls
-     *
-     * @var bool
-     */
-    private static $isProcessing = false;
-
-    /**
      * @param Data $helper
      * @param CheckoutSession $checkoutSession
      * @param ManagerInterface $messageManager
