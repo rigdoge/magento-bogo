@@ -1,8 +1,8 @@
 {
     "name": "bogo/module-buyonegetone",
-    "description": "Magento 2 Buy One Get One Free Module",
+    "description": "Buy One Get One Free module for Magento 2",
     "type": "magento2-module",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "keywords": [
         "magento2",
         "magento2-module",
@@ -11,10 +11,7 @@
         "buy-one-get-one"
     ],
     "homepage": "https://github.com/rigdoge/magento-bogo",
-    "license": [
-        "OSL-3.0",
-        "AFL-3.0"
-    ],
+    "license": "MIT",
     "authors": [
         {
             "name": "Bogo",

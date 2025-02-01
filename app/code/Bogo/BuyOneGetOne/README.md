@@ -40,6 +40,7 @@ php bin/magento cache:flush
 
 1. 在 Magento 2 项目根目录运行:
 ```bash
+rm -rf vendor/bogo
 composer remove bogo/module-buyonegetone
 ```
 
