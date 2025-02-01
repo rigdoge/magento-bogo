@@ -6,6 +6,7 @@ use Magento\Framework\Event\Observer;
 use Bogo\BuyOneGetOne\Helper\Data;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Framework\Exception\LocalizedException;
 
 class SyncQuantities implements ObserverInterface
 {
@@ -50,48 +51,37 @@ class SyncQuantities implements ObserverInterface
         }
 
         try {
-            /** @var \Magento\Quote\Model\Quote $quote */
             $quote = $this->checkoutSession->getQuote();
             if (!$quote) {
                 return;
             }
 
-            $bogoItems = [];
-            // 收集所有买一送一商品
-            foreach ($quote->getAllItems() as $item) {
-                if (!$item->getProduct()->getData('buy_one_get_one')) {
+            $items = $quote->getAllItems();
+            foreach ($items as $item) {
+                if (!$item->getData('is_bogo_free')) {
                     continue;
                 }
 
-                $productId = $item->getProduct()->getId();
-                if (!isset($bogoItems[$productId])) {
-                    $bogoItems[$productId] = [
-                        'paid' => null,
-                        'free' => null
-                    ];
-                }
-
-                // 根据标识区分付费和免费商品
-                if ($item->getData('is_bogo_free')) {
-                    $bogoItems[$productId]['free'] = $item;
-                } else {
-                    $bogoItems[$productId]['paid'] = $item;
-                }
-            }
-
-            // 同步每对商品的数量
-            foreach ($bogoItems as $items) {
-                if (!$items['paid'] || !$items['free']) {
+                $product = $item->getProduct();
+                if (!$product || !$product->getData('buy_one_get_one')) {
                     continue;
                 }
 
-                $paidQty = $items['paid']->getQty();
-                if ($items['free']->getQty() != $paidQty) {
-                    $items['free']->setQty($paidQty);
+                // 查找对应的付费商品
+                foreach ($items as $paidItem) {
+                    if ($paidItem->getData('is_bogo_free')) {
+                        continue;
+                    }
+
+                    if ($paidItem->getProduct()->getId() == $product->getId()) {
+                        // 同步数量
+                        $item->setQty($paidItem->getQty());
+                        break;
+                    }
                 }
             }
-
-            $quote->collectTotals()->save();
+        } catch (LocalizedException $e) {
+            $this->messageManager->addErrorMessage($e->getMessage());
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to sync BOGO quantities.'));
         }
