@@ -1,0 +1,21 @@
+# IDE
+.idea
+.vscode
+
+# Composer
+/vendor/
+composer.lock
+
+# Magento
+/pub/
+/var/
+/generated/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
