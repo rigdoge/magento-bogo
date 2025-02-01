@@ -3,6 +3,14 @@
     "description": "Magento 2 Buy One Get One Free Module",
     "type": "magento2-module",
     "version": "1.1.0",
+    "keywords": [
+        "magento2",
+        "magento2-module",
+        "magento2-extension",
+        "bogo",
+        "buy-one-get-one"
+    ],
+    "homepage": "https://github.com/rigdoge/magento-bogo",
     "license": [
         "OSL-3.0",
         "AFL-3.0"
@@ -10,29 +18,24 @@
     "authors": [
         {
             "name": "Bogo",
-            "email": "support@tschenfeng.com"
+            "email": "support@tschenfeng.com",
+            "homepage": "https://github.com/rigdoge",
+            "role": "Developer"
         }
     ],
-    "minimum-stability": "dev",
-    "prefer-stable": true,
+    "minimum-stability": "stable",
     "require": {
-        "php": "~7.4.0||~8.1.0",
+        "php": "~8.2.0||~8.3.0",
         "magento/framework": "103.0.*",
         "magento/module-catalog": "104.0.*",
         "magento/module-checkout": "100.4.*"
     },
     "autoload": {
         "files": [
-            "registration.php"
+            "app/code/Bogo/BuyOneGetOne/registration.php"
         ],
         "psr-4": {
-            "Bogo\\BuyOneGetOne\\": ""
-        }
-    },
-    "repositories": {
-        "bogo": {
-            "type": "vcs",
-            "url": "https://github.com/rigdoge/magento-bogo.git"
+            "Bogo\\BuyOneGetOne\\": "app/code/Bogo/BuyOneGetOne"
         }
     }
 }
