@@ -2,12 +2,12 @@
     "name": "bogo/module-buyonegetone",
     "description": "Buy One Get One Free module for Magento 2",
     "type": "magento2-module",
-    "version": "1.0.0",
+    "version": "1.0.0-dev",
     "license": "MIT",
     "authors": [
         {
             "name": "Bogo",
-            "email": "support@bogo.com"
+            "email": "support@tschenfeng.com"
         }
     ],
     "minimum-stability": "dev",
