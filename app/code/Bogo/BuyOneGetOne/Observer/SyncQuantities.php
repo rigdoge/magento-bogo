@@ -56,22 +56,29 @@ class SyncQuantities implements ObserverInterface
 
                 $productId = $item->getProduct()->getId();
                 if (!isset($bogoItems[$productId])) {
-                    $bogoItems[$productId] = [];
+                    $bogoItems[$productId] = [
+                        'paid' => null,
+                        'free' => null
+                    ];
                 }
-                $bogoItems[$productId][] = $item;
+
+                // 根据价格区分付费和免费商品
+                if ($item->getCustomPrice() === 0.0 || $item->getPrice() == 0) {
+                    $bogoItems[$productId]['free'] = $item;
+                } else {
+                    $bogoItems[$productId]['paid'] = $item;
+                }
             }
 
             // 同步每对商品的数量
             foreach ($bogoItems as $items) {
-                if (count($items) !== 2) {
+                if (!$items['paid'] || !$items['free']) {
                     continue;
                 }
 
-                $qty = max($items[0]->getQty(), $items[1]->getQty());
-                foreach ($items as $item) {
-                    if ($item->getQty() != $qty) {
-                        $item->setQty($qty);
-                    }
+                $paidQty = $items['paid']->getQty();
+                if ($items['free']->getQty() != $paidQty) {
+                    $items['free']->setQty($paidQty);
                 }
             }
         } catch (\Exception $e) {
