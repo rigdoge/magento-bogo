@@ -85,9 +85,16 @@ class AddFreeProduct implements ObserverInterface
             }
 
             if ($existingFreeItem) {
-                // 如果已存在免费商品，更新其数量
-                $newQty = $existingFreeItem->getQty() + $item->getQty();
-                $existingFreeItem->setQty($newQty);
+                // 如果已存在免费商品，直接设置与付费商品相同的数量
+                $paidQty = 0;
+                // 计算所有付费商品的总数量
+                foreach ($quote->getAllItems() as $quoteItem) {
+                    if ($quoteItem->getPrice() > 0 && 
+                        $quoteItem->getProduct()->getId() == $product->getId()) {
+                        $paidQty += $quoteItem->getQty();
+                    }
+                }
+                $existingFreeItem->setQty($paidQty);
             } else {
                 // 如果不存在，创建新的免费商品
                 $freeItem = $this->cartItemFactory->create();
