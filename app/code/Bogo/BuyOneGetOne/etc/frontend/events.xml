@@ -5,4 +5,8 @@
         <observer name="bogo_buyonegetone_add_free_product" 
                   instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct" />
     </event>
+    <event name="sales_quote_item_qty_set_after">
+        <observer name="bogo_buyonegetone_update_free_product" 
+                  instance="Bogo\BuyOneGetOne\Observer\UpdateFreeProduct" />
+    </event>
 </config> 

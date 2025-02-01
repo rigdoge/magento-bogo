@@ -26,6 +26,16 @@ php bin/magento cache:clean
 php bin/magento cache:flush
 ```
 
+### 升级
+```bash
+composer update bogo/module-buyonegetone
+php bin/magento setup:upgrade
+php bin/magento setup:di:compile
+php bin/magento setup:static-content:deploy -f
+php bin/magento cache:clean
+php bin/magento cache:flush
+```
+
 ### 卸载方法
 
 1. 在 Magento 2 项目根目录运行:
