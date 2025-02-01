@@ -1,9 +1,12 @@
 {
     "name": "bogo/module-buyonegetone",
-    "description": "Buy One Get One Free module for Magento 2",
+    "description": "Magento 2 Buy One Get One Free Module",
     "type": "magento2-module",
-    "version": "1.0.0-dev",
-    "license": "MIT",
+    "version": "1.1.0",
+    "license": [
+        "OSL-3.0",
+        "AFL-3.0"
+    ],
     "authors": [
         {
             "name": "Bogo",
@@ -13,17 +16,17 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": "~8.2.0||~8.3.0",
+        "php": "~7.4.0||~8.1.0",
         "magento/framework": "103.0.*",
         "magento/module-catalog": "104.0.*",
         "magento/module-checkout": "100.4.*"
     },
     "autoload": {
         "files": [
-            "app/code/Bogo/BuyOneGetOne/registration.php"
+            "registration.php"
         ],
         "psr-4": {
-            "Bogo\\BuyOneGetOne\\": "app/code/Bogo/BuyOneGetOne"
+            "Bogo\\BuyOneGetOne\\": ""
         }
     },
     "repositories": {
