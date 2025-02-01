@@ -102,6 +102,8 @@ class AddFreeProduct implements ObserverInterface
                 $freeItem->setQty($item->getQty());
                 $freeItem->setCustomPrice(0);
                 $freeItem->setOriginalCustomPrice(0);
+                // 添加标识，表明这是BOGO免费商品
+                $freeItem->setData('is_bogo_free', 1);
                 $freeItem->getProduct()->setIsSuperMode(true);
                 $quote->addItem($freeItem);
             }

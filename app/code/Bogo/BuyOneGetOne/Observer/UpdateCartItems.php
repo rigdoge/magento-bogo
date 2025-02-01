@@ -54,46 +54,33 @@ class UpdateCartItems implements ObserverInterface
             $data = $observer->getEvent()->getInfo();
             $quote = $cart->getQuote();
             
-            // 收集所有买一送一商品的信息
-            $bogoItems = [];
-            foreach ($quote->getAllItems() as $item) {
-                $product = $item->getProduct();
-                if (!$product->getBuyOneGetOne()) {
+            // 遍历所有被更新的商品
+            foreach ($data as $itemId => $itemInfo) {
+                if (!isset($itemInfo['qty'])) {
                     continue;
                 }
 
-                $productId = $product->getId();
-                if (!isset($bogoItems[$productId])) {
-                    $bogoItems[$productId] = [
-                        'paid' => null,
-                        'free' => null,
-                        'new_qty' => 0
-                    ];
+                $currentItem = $quote->getItemById($itemId);
+                if (!$currentItem || !$currentItem->getProduct()->getBuyOneGetOne()) {
+                    continue;
                 }
 
-                // 记录商品信息
-                if ($item->getPrice() > 0) {
-                    $bogoItems[$productId]['paid'] = $item;
-                    // 如果这个商品在更新数据中，使用新数量
-                    if (isset($data[$item->getId()]['qty'])) {
-                        $bogoItems[$productId]['new_qty'] = (float)$data[$item->getId()]['qty'];
-                    } else {
-                        $bogoItems[$productId]['new_qty'] = $item->getQty();
-                    }
-                } else {
-                    $bogoItems[$productId]['free'] = $item;
-                    // 如果免费商品在更新数据中，使用新数量
-                    if (isset($data[$item->getId()]['qty'])) {
-                        $bogoItems[$productId]['new_qty'] = (float)$data[$item->getId()]['qty'];
-                    }
-                }
-            }
+                $newQty = (float)$itemInfo['qty'];
+                $productId = $currentItem->getProduct()->getId();
+                $isFreeItem = (bool)$currentItem->getData('is_bogo_free');
 
-            // 同步数量
-            foreach ($bogoItems as $items) {
-                if ($items['paid'] && $items['free']) {
-                    $items['paid']->setQty($items['new_qty']);
-                    $items['free']->setQty($items['new_qty']);
+                // 查找对应的商品（如果当前是付费商品，查找免费商品，反之亦然）
+                foreach ($quote->getAllItems() as $item) {
+                    if ($item->getProduct()->getId() == $productId && $item->getId() != $itemId) {
+                        $isItemFree = (bool)$item->getData('is_bogo_free');
+                        // 确保一个是付费商品，一个是免费商品
+                        if ($isItemFree != $isFreeItem) {
+                            // 更新数量
+                            $item->setQty($newQty);
+                            $currentItem->setQty($newQty);
+                            break;
+                        }
+                    }
                 }
             }
 
