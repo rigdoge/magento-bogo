@@ -175,13 +175,29 @@ class BogoManager
     {
         $totalQty = 0;
         $processedItems = [];
-        foreach ($quote->getAllItems() as $item) {
+        
+        // 获取购物车中的所有商品
+        $items = $quote->getAllVisibleItems();
+        
+        $this->logger->debug('Processing cart items', [
+            'quote_id' => $quote->getId(),
+            'total_items' => count($items),
+            'product_id' => $productId
+        ]);
+        
+        foreach ($items as $item) {
             if ($item->getProductId() == $productId && 
                 !$item->getData('is_bogo_free') && 
                 !in_array($item->getId(), $processedItems)
             ) {
                 $totalQty += $item->getQty();
                 $processedItems[] = $item->getId();
+                
+                $this->logger->debug('Added item quantity', [
+                    'item_id' => $item->getId(),
+                    'qty' => $item->getQty(),
+                    'running_total' => $totalQty
+                ]);
             }
         }
         $this->logger->debug('Calculated total paid quantity', [
