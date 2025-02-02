@@ -174,9 +174,14 @@ class BogoManager
     private function getTotalPaidQtyForProduct(Quote $quote, $productId)
     {
         $totalQty = 0;
+        $processedItems = [];
         foreach ($quote->getAllItems() as $item) {
-            if ($item->getProductId() == $productId && !$item->getData('is_bogo_free')) {
+            if ($item->getProductId() == $productId && 
+                !$item->getData('is_bogo_free') && 
+                !in_array($item->getId(), $processedItems)
+            ) {
                 $totalQty += $item->getQty();
+                $processedItems[] = $item->getId();
             }
         }
         $this->logger->debug('Calculated total paid quantity', [
