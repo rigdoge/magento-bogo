@@ -137,6 +137,10 @@ class BogoManager
     private function updateBogoItemsForProduct(Quote $quote, Item $paidItem)
     {
         $productId = $paidItem->getProductId();
+        
+        // 先合并相同商品的购物车项目
+        $this->mergeCartItems($quote, $productId);
+        
         $paidQty = $this->getTotalPaidQtyForProduct($quote, $productId);
         $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
         
@@ -161,6 +165,41 @@ class BogoManager
                 'to' => $expectedFreeQty
             ]);
             $this->updateFreeItems($quote, $paidItem, $expectedFreeQty, $freeItems);
+        }
+    }
+    
+    /**
+     * 合并购物车中相同商品的项目
+     *
+     * @param Quote $quote
+     * @param int $productId
+     */
+    private function mergeCartItems(Quote $quote, $productId)
+    {
+        $items = $quote->getAllVisibleItems();
+        $firstItem = null;
+        $itemsToRemove = [];
+        
+        foreach ($items as $item) {
+            if ($item->getProductId() == $productId && !$item->getData('is_bogo_free')) {
+                if (!$firstItem) {
+                    $firstItem = $item;
+                } else {
+                    // 将数量加到第一个项目上
+                    $firstItem->setQty($firstItem->getQty() + $item->getQty());
+                    $itemsToRemove[] = $item;
+                }
+            }
+        }
+        
+        // 移除其他项目
+        foreach ($itemsToRemove as $item) {
+            $quote->removeItem($item->getId());
+            $this->logger->debug('Merged and removed cart item', [
+                'removed_item_id' => $item->getId(),
+                'merged_into_item_id' => $firstItem->getId(),
+                'new_qty' => $firstItem->getQty()
+            ]);
         }
     }
 
