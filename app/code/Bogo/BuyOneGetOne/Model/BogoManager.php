@@ -7,6 +7,7 @@ use Magento\Quote\Model\Quote\Item;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
 use Magento\Quote\Model\Quote\ItemFactory;
+use Magento\Catalog\Api\ProductRepositoryInterface;
 use Bogo\BuyOneGetOne\Helper\Data;
 use Bogo\BuyOneGetOne\Logger\Logger;
 
@@ -38,24 +39,32 @@ class BogoManager
     private $logger;
 
     /**
+     * @var ProductRepositoryInterface
+     */
+    private $productRepository;
+
+    /**
      * @param Data $helper
      * @param ManagerInterface $messageManager
      * @param PricingHelper $priceHelper
      * @param ItemFactory $itemFactory
      * @param Logger $logger
+     * @param ProductRepositoryInterface $productRepository
      */
     public function __construct(
         Data $helper,
         ManagerInterface $messageManager,
         PricingHelper $priceHelper,
         ItemFactory $itemFactory,
-        Logger $logger
+        Logger $logger,
+        ProductRepositoryInterface $productRepository
     ) {
         $this->helper = $helper;
         $this->messageManager = $messageManager;
         $this->priceHelper = $priceHelper;
         $this->itemFactory = $itemFactory;
         $this->logger = $logger;
+        $this->productRepository = $productRepository;
     }
 
     /**
@@ -83,17 +92,26 @@ class BogoManager
             return;
         }
 
-        $product = $quoteItem->getProduct();
-        $this->logger->debug('Checking product BOGO eligibility', [
-            'product_id' => $product->getId(),
-            'buy_one_get_one' => $product->getData('buy_one_get_one'),
-            'buy_one_get_one_attribute' => $product->getResource()->getAttribute('buy_one_get_one'),
-            'all_attributes' => array_keys($product->getData())
-        ]);
+        try {
+            // 重新加载产品以确保所有属性都被加载
+            $product = $this->productRepository->getById($quoteItem->getProductId());
+            $this->logger->debug('Checking product BOGO eligibility', [
+                'product_id' => $product->getId(),
+                'buy_one_get_one' => $product->getData('buy_one_get_one'),
+                'buy_one_get_one_value' => $product->getBuyOneGetOne(),
+                'all_attributes' => array_keys($product->getData())
+            ]);
 
-        if (!$product->getData('buy_one_get_one')) {
-            $this->logger->debug('Product is not BOGO eligible', [
-                'product_id' => $product->getId()
+            if (!$product->getData('buy_one_get_one') && !$product->getBuyOneGetOne()) {
+                $this->logger->debug('Product is not BOGO eligible', [
+                    'product_id' => $product->getId()
+                ]);
+                return;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Error loading product', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return;
         }
