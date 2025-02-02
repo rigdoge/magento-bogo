@@ -74,7 +74,7 @@ class BogoManager
      * @param Item $quoteItem
      * @return void
      */
-    public function processBogoForItem(Quote $quote, Item $quoteItem)
+    public function processBogoForItem(Quote $quote, Item $quoteItem): void
     {
         $this->logger->debug('Processing BOGO for item', [
             'quote_id' => $quote->getId(),
@@ -134,7 +134,7 @@ class BogoManager
      * @param Item $paidItem
      * @return void
      */
-    private function updateBogoItemsForProduct(Quote $quote, Item $paidItem)
+    private function updateBogoItemsForProduct(Quote $quote, Item $paidItem): void
     {
         try {
             $productId = $paidItem->getProductId();
@@ -176,7 +176,7 @@ class BogoManager
      * @param Quote $quote
      * @param int $productId
      */
-    private function getFreeItemsForProduct(Quote $quote, $productId)
+    private function getFreeItemsForProduct(Quote $quote, $productId): array
     {
         $freeItems = [];
         foreach ($quote->getAllVisibleItems() as $item) {
@@ -194,7 +194,7 @@ class BogoManager
      * @param int $productId
      * @return float
      */
-    private function getTotalPaidQtyForProduct(Quote $quote, $productId)
+    private function getTotalPaidQtyForProduct(Quote $quote, $productId): float
     {
         $totalQty = 0;
         $processedItems = [];
@@ -252,7 +252,7 @@ class BogoManager
      * @param int $productId
      * @return Item[]
      */
-    private function getFreeItemsForProduct(Quote $quote, $productId)
+    private function getFreeItemsForProduct(Quote $quote, $productId): array
     {
         $freeItems = [];
         foreach ($quote->getAllItems() as $item) {
@@ -270,7 +270,7 @@ class BogoManager
      * @param \Magento\Catalog\Model\Product $product
      * @return float
      */
-    private function calculateExpectedFreeQty($paidQty, $product)
+    private function calculateExpectedFreeQty($paidQty, $product): float
     {
         // 计算基础免费数量：每个付费商品送一个
         $baseFreeQty = $paidQty;
@@ -304,7 +304,7 @@ class BogoManager
      * @param array $existingFreeItems
      * @return void
      */
-    private function updateFreeItems(Quote $quote, Item $paidItem, $expectedFreeQty, array $existingFreeItems)
+    private function updateFreeItems(Quote $quote, Item $paidItem, $expectedFreeQty, array $existingFreeItems): void
     {
         $this->logger->debug('Updating free items', [
             'expected_qty' => $expectedFreeQty,
@@ -356,7 +356,7 @@ class BogoManager
      * @param float $freeQty
      * @return void
      */
-    private function createFreeItem(Quote $quote, Item $paidItem, $freeQty)
+    private function createFreeItem(Quote $quote, Item $paidItem, $freeQty): void
     {
         $freeItem = $this->itemFactory->create();
         $freeItem->setProduct($paidItem->getProduct())
@@ -376,7 +376,7 @@ class BogoManager
             ->setDiscountAmount(0)
             ->setBaseDiscountAmount(0)
             ->setDiscountPercent(0)
-            ->setData('is_bogo_free', 1)
+            ->setData('is_bogo_free', true)
             ->setData('no_discount', 1);
 
         $this->logger->debug('Creating free item', [
