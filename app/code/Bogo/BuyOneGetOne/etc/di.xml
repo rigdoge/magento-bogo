@@ -12,4 +12,10 @@
                 type="Bogo\BuyOneGetOne\Plugin\CartItemAdd" 
                 sortOrder="10" />
     </type>
+
+    <type name="Magento\Quote\Model\Quote\TotalsCollector">
+        <plugin name="bogo_quote_totals" 
+                type="Bogo\BuyOneGetOne\Plugin\QuoteTotals" 
+                sortOrder="10" />
+    </type>
 </config>

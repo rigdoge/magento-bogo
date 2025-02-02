@@ -18,19 +18,32 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 
 
 
-rm -rf vendor/bogo
-composer clearcache
-composer remove bogo/module-buyonegetone
-composer require bogo/module-buyonegetone:1.4.0
 
+
+
+```bash
+# 清除composer缓存
+composer clearcache
+
+# 添加GitHub仓库（这样可以立即获取最新版本）
+composer config repositories.bogo vcs https://github.com/rigdoge/magento-bogo.git
+
+# 安装新版本
+composer require "bogo/module-buyonegetone:1.4.4"
+
+# 清理缓存并重新编译
 rm -rf var/cache/* var/page_cache/* var/view_preprocessed/* var/generation/* generated/*
 php bin/magento cache:clean
 php bin/magento cache:flush
 php bin/magento setup:upgrade
 php bin/magento setup:di:compile
 php bin/magento setup:static-content:deploy -f
-php bin/magento cache:clean
-php bin/magento cache:flush
+```
+
+
+
+
+
 
 ### 1. Using Composer (Recommended)
 
