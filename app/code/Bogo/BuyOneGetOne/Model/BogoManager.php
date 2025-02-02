@@ -214,8 +214,8 @@ class BogoManager
      */
     private function calculateExpectedFreeQty($paidQty, $product)
     {
-        // 计算基础免费数量：每两个付费商品送一个
-        $baseFreeQty = floor($paidQty / 2);
+        // 计算基础免费数量：每个付费商品送一个
+        $baseFreeQty = $paidQty;
         
         $globalMaxFree = $this->helper->getMaxFreeItems();
         $productMaxFree = (float)$product->getData('bogo_max_free');
