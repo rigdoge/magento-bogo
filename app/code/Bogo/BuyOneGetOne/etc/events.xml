@@ -5,8 +5,4 @@
         <observer name="bogo_add_to_cart_after" 
                  instance="Bogo\BuyOneGetOne\Observer\AddToCartAfter"/>
     </event>
-    <event name="sales_quote_item_qty_set_after">
-        <observer name="bogo_update_cart_item_after" 
-                 instance="Bogo\BuyOneGetOne\Observer\UpdateCartItemAfter"/>
-    </event>
 </config>

@@ -40,6 +40,8 @@ class AddToCartAfter implements ObserverInterface
     {
         $quote = $observer->getQuote();
         $item = $observer->getQuoteItem();
-        $this->bogoManager->processCartItem($quote, $item);
+        if ($quote && $item) {
+            $this->bogoManager->processBogoForItem($quote, $item);
+        }
     }
 }

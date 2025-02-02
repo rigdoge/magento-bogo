@@ -24,7 +24,7 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 composer require bogo/module-buyonegetone
 
 # 方法 2：如果需要指定版本
-composer require bogo/module-buyonegetone:1.1.2
+composer require bogo/module-buyonegetone:1.4.0
 
 # 方法 3：如果遇到冲突，可以先添加依赖再更新
 composer require bogo/module-buyonegetone --no-update
@@ -33,7 +33,7 @@ composer update bogo/module-buyonegetone --with-dependencies
 
 注意：
 - 确保你的 `composer.json` 中已经配置了 `https://repo.magento.com/`
-- 如果安装特定版本，建议使用最新的稳定版本（当前是 1.1.2）
+- 如果安装特定版本，建议使用最新的稳定版本（当前是 1.4.0）
 
 ### 2. Enable the Module
 

@@ -84,20 +84,8 @@ class CartItemAdd
             
             $freeQty = $maxFree > 0 ? min($result->getQty(), $maxFree) : $result->getQty();
 
-            // 创建免费商品
-            $freeItem = $this->itemFactory->create();
-            $freeItem->setProduct($product)
-                ->setQty($freeQty)
-                ->setCustomPrice(0)
-                ->setOriginalCustomPrice(0)
-                ->setPrice(0)
-                ->setBasePrice(0)
-                ->setPriceInclTax(0)
-                ->setBasePriceInclTax(0)
-                ->setData('is_bogo_free', 1)
-                ->setData('no_discount', 1);
-
-            $subject->addItem($freeItem);
+            // 使用BogoManager处理免费商品
+            $this->bogoManager->processBogoForItem($subject, $result);
 
             $formattedPrice = $this->priceHelper->currency($product->getFinalPrice(), true, false);
             $this->messageManager->addSuccessMessage(
