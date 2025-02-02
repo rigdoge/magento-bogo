@@ -36,6 +36,13 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 
 ### Via Composer
 
+#### Version Constraints Explained
+- `^1.1.0`: Installs the latest stable version >= 1.1.0 and < 2.0.0 (Recommended)
+- `~1.1.0`: Installs the latest stable version >= 1.1.0 and < 1.2.0
+- `1.1.0`: Installs exactly version 1.1.0
+- `*`: Installs the latest version (including breaking changes)
+- `dev-develop`: Installs the latest development code
+
 #### Install Latest Stable Version (Recommended)
 ```bash
 composer require bogo/module-buyonegetone:^1.1.0
@@ -61,7 +68,25 @@ bin/magento cache:clean
 
 ## Upgrade
 
-### Regular Upgrade
+### Understanding Upgrade Commands
+
+#### composer update
+```bash
+composer update bogo/module-buyonegetone
+```
+This command updates the package based on the version constraint in your composer.json:
+- If you have `^1.0.0`: Updates to latest 1.x.x version
+- If you have `~1.0.0`: Updates to latest 1.0.x version
+- If you have `*`: Updates to the latest version
+- If you have `dev-develop`: Updates to latest development code
+
+#### composer require
+```bash
+composer require bogo/module-buyonegetone:^1.1.0
+```
+This command explicitly updates to the specified version constraint, regardless of what's in your composer.json
+
+### Regular Upgrade (Based on composer.json)
 ```bash
 composer update bogo/module-buyonegetone
 bin/magento setup:upgrade
@@ -69,7 +94,7 @@ bin/magento setup:di:compile
 bin/magento cache:clean
 ```
 
-### Upgrade to Latest Version
+### Upgrade to Latest Version (Recommended)
 ```bash
 composer require bogo/module-buyonegetone:^1.1.0
 bin/magento setup:upgrade
