@@ -6,9 +6,4 @@
                 type="Bogo\BuyOneGetOne\Plugin\QuoteTotals" 
                 sortOrder="10"/>
     </type>
-    <type name="Magento\Checkout\Model\Cart">
-        <plugin name="bogo_cart_item_add" 
-                type="Bogo\BuyOneGetOne\Plugin\CartItemAdd" 
-                sortOrder="10"/>
-    </type>
 </config>

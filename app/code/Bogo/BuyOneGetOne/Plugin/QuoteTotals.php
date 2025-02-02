@@ -81,45 +81,74 @@ class QuoteTotals
     {
         $bogoItems = [];
         $maxFreeItems = $this->helper->getMaxFreeItems();
-        $lastItem = null;
+        $freeItems = [];
         
-        // 收集所有BOGO商品信息
+        // 第一步：收集所有商品信息
         foreach ($quote->getAllItems() as $item) {
-            if (!$item->getData('is_bogo_free') && 
-                $item->getProduct()->getData('buy_one_get_one')
-            ) {
-                $productId = $item->getProductId();
+            $productId = $item->getProductId();
+            if ($item->getData('is_bogo_free')) {
+                // 收集免费商品信息
+                if (!isset($freeItems[$productId])) {
+                    $freeItems[$productId] = [];
+                }
+                $freeItems[$productId][] = $item;
+            } elseif ($item->getProduct()->getData('buy_one_get_one')) {
+                // 收集付费商品信息
                 if (!isset($bogoItems[$productId])) {
                     $bogoItems[$productId] = [
                         'paid_qty' => 0,
-                        'item' => $item,
-                        'is_new' => false
+                        'items' => [],
                     ];
                 }
                 $bogoItems[$productId]['paid_qty'] += $item->getQty();
-                
-                // 检查是否是新添加的商品
-                if ($lastItem === null || $item->getId() > $lastItem->getId()) {
-                    $lastItem = $item;
-                    $bogoItems[$productId]['is_new'] = true;
+                $bogoItems[$productId]['items'][] = $item;
+            }
+        }
+        
+        // 第二步：处理每个BOGO商品
+        foreach ($bogoItems as $productId => $data) {
+            // 计算应该有的免费商品数量
+            $expectedFreeQty = $maxFreeItems > 0 ? min($data['paid_qty'], $maxFreeItems) : $data['paid_qty'];
+            
+            // 计算当前已有的免费商品数量
+            $currentFreeQty = 0;
+            if (isset($freeItems[$productId])) {
+                foreach ($freeItems[$productId] as $freeItem) {
+                    $currentFreeQty += $freeItem->getQty();
+                }
+            }
+            
+            // 如果需要添加新的免费商品
+            if ($expectedFreeQty > $currentFreeQty) {
+                $newFreeQty = $expectedFreeQty - $currentFreeQty;
+                $this->createFreeItem($quote, end($data['items']), $newFreeQty);
+            }
+            // 如果需要减少免费商品
+            elseif ($expectedFreeQty < $currentFreeQty && isset($freeItems[$productId])) {
+                $remainingQty = $expectedFreeQty;
+                foreach ($freeItems[$productId] as $freeItem) {
+                    if ($remainingQty > 0) {
+                        // 更新数量
+                        $freeItem->setQty(min($freeItem->getQty(), $remainingQty));
+                        $remainingQty -= $freeItem->getQty();
+                    } else {
+                        // 移除多余的免费商品
+                        $quote->removeItem($freeItem->getId());
+                    }
                 }
             }
         }
         
-        // 更新或创建免费商品
-        foreach ($bogoItems as $productId => $data) {
-            $freeQty = $maxFreeItems > 0 ? min($data['paid_qty'], $maxFreeItems) : $data['paid_qty'];
-            
-            // 如果是新添加的商品，直接创建新的免费商品
-            if ($data['is_new']) {
-                $this->createFreeItem($quote, $data['item'], $data['item']->getQty());
-            } else {
-                $this->updateFreeItem($quote, $data['item'], $freeQty);
+        // 第三步：清理不需要的免费商品
+        foreach ($quote->getAllItems() as $item) {
+            if ($item->getData('is_bogo_free')) {
+                $productId = $item->getProductId();
+                if (!isset($bogoItems[$productId])) {
+                    // 如果没有对应的付费商品，移除免费商品
+                    $quote->removeItem($item->getId());
+                }
             }
         }
-        
-        // 清理不需要的免费商品
-        $this->cleanupFreeItems($quote, array_keys($bogoItems));
     }
 
     /**
