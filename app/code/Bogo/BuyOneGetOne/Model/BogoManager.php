@@ -170,22 +170,7 @@ class BogoManager
         }
     }
     
-    /**
-     * 合并购物车中相同商品的项目
-     *
-     * @param Quote $quote
-     * @param int $productId
-     */
-    private function getFreeItemsForProduct(Quote $quote, $productId): array
-    {
-        $freeItems = [];
-        foreach ($quote->getAllVisibleItems() as $item) {
-            if ($item->getProductId() == $productId && $item->getData('is_bogo_free')) {
-                $freeItems[] = $item;
-            }
-        }
-        return $freeItems;
-    }
+
 
     /**
      * Get total paid quantity for a product
