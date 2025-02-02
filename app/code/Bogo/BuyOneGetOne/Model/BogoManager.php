@@ -175,8 +175,7 @@ class BogoManager
             ]);
             throw $e;
         }
-    
-
+    }
 
     /**
      * Get total paid quantity for a product
