@@ -84,6 +84,13 @@ class BogoManager
         }
 
         $product = $quoteItem->getProduct();
+        $this->logger->debug('Checking product BOGO eligibility', [
+            'product_id' => $product->getId(),
+            'buy_one_get_one' => $product->getData('buy_one_get_one'),
+            'buy_one_get_one_attribute' => $product->getResource()->getAttribute('buy_one_get_one'),
+            'all_attributes' => array_keys($product->getData())
+        ]);
+
         if (!$product->getData('buy_one_get_one')) {
             $this->logger->debug('Product is not BOGO eligible', [
                 'product_id' => $product->getId()
