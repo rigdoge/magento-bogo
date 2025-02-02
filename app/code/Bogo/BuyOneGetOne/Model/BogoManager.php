@@ -309,8 +309,28 @@ class BogoManager
             ->setBasePrice(0)
             ->setPriceInclTax(0)
             ->setBasePriceInclTax(0)
+            ->setRowTotal(0)
+            ->setBaseRowTotal(0)
+            ->setRowTotalInclTax(0)
+            ->setBaseRowTotalInclTax(0)
+            ->setTaxAmount(0)
+            ->setBaseTaxAmount(0)
+            ->setDiscountAmount(0)
+            ->setBaseDiscountAmount(0)
+            ->setDiscountPercent(0)
             ->setData('is_bogo_free', 1)
             ->setData('no_discount', 1);
+
+        $this->logger->debug('Creating free item', [
+            'quote_id' => $quote->getId(),
+            'product_id' => $paidItem->getProduct()->getId(),
+            'qty' => $freeQty,
+            'price' => $freeItem->getPrice(),
+            'base_price' => $freeItem->getBasePrice(),
+            'custom_price' => $freeItem->getCustomPrice(),
+            'row_total' => $freeItem->getRowTotal(),
+            'tax_amount' => $freeItem->getTaxAmount()
+        ]);
 
         $quote->addItem($freeItem);
 
