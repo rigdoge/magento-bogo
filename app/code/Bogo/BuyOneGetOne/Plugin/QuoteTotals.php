@@ -91,7 +91,7 @@ class QuoteTotals
                     $freeItems[$productId] = [];
                 }
                 $freeItems[$productId][] = $item;
-            } elseif ($item->getProduct()->getData('buy_one_get_one')) {
+            } elseif ($item->getProduct()->getData('buy_one_get_one') || $item->getProduct()->getBuyOneGetOne()) {
                 if (!isset($bogoItems[$productId])) {
                     $bogoItems[$productId] = [
                         'paid_qty' => 0,
