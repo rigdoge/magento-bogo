@@ -186,6 +186,14 @@ class BogoManager
         ]);
         
         foreach ($items as $item) {
+            $this->logger->debug('Processing item', [
+                'item_id' => $item->getId(),
+                'product_id' => $item->getProductId(),
+                'qty' => $item->getQty(),
+                'is_bogo_free' => $item->getData('is_bogo_free'),
+                'processed' => in_array($item->getId(), $processedItems)
+            ]);
+            
             if ($item->getProductId() == $productId && 
                 !$item->getData('is_bogo_free') && 
                 !in_array($item->getId(), $processedItems)
@@ -197,6 +205,12 @@ class BogoManager
                     'item_id' => $item->getId(),
                     'qty' => $item->getQty(),
                     'running_total' => $totalQty
+                ]);
+            } else {
+                $this->logger->debug('Skipped item', [
+                    'reason' => $item->getProductId() != $productId ? 'different_product' : 
+                              ($item->getData('is_bogo_free') ? 'is_free_item' : 
+                              (in_array($item->getId(), $processedItems) ? 'already_processed' : 'unknown'))
                 ]);
             }
         }
