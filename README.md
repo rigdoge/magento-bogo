@@ -15,7 +15,12 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 
 ## Version History
 
-### v1.1.1 (Latest)
+### v1.1.2 (Latest)
+- Fixed BOGO items not being added correctly for subsequent cart additions
+- Improved handling of new item detection
+- Optimized cart update logic
+
+### v1.1.1
 - Fixed issue with BOGO items not being added on subsequent cart updates
 - Optimized cart item handling logic
 - Removed redundant code and improved maintainability
