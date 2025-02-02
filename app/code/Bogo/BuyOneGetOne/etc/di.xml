@@ -4,9 +4,6 @@
     <type name="Bogo\BuyOneGetOne\Logger\Logger">
         <arguments>
             <argument name="name" xsi:type="string">bogo</argument>
-            <argument name="handlers" xsi:type="array">
-                <item name="system" xsi:type="object">Bogo\BuyOneGetOne\Logger\Handler</item>
-            </argument>
         </arguments>
     </type>
 </config>

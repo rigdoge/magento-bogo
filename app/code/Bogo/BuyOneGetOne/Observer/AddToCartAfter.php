@@ -38,18 +38,8 @@ class AddToCartAfter implements ObserverInterface
      */
     public function execute(Observer $observer)
     {
-        $quoteItem = $observer->getEvent()->getQuoteItem();
-        $quote = $observer->getEvent()->getQuote();
-        
-        $this->logger->debug('AddToCartAfter observer triggered', [
-            'quote_id' => $quote ? $quote->getId() : null,
-            'item_id' => $quoteItem ? $quoteItem->getId() : null,
-            'product_id' => $quoteItem ? $quoteItem->getProductId() : null,
-            'qty' => $quoteItem ? $quoteItem->getQty() : null
-        ]);
-        
-        if ($quoteItem && $quote) {
-            $this->bogoManager->processBogoForItem($quote, $quoteItem);
-        }
+        $quote = $observer->getQuote();
+        $item = $observer->getQuoteItem();
+        $this->bogoManager->processCartItem($quote, $item);
     }
 }

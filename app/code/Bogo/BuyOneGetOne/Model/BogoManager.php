@@ -138,13 +138,10 @@ class BogoManager
     {
         try {
             $productId = $paidItem->getProductId();
+            $paidQty = $paidItem->getQty();
             
-            // 先合并相同商品的购物车项目
-            $this->mergeCartItems($quote, $productId);
-            
-            $paidQty = $this->getTotalPaidQtyForProduct($quote, $productId);
             if ($paidQty > 1000) {
-                throw new LocalizedException(__('The total quantity cannot exceed 1000.'));
+                throw new LocalizedException(__('The quantity cannot exceed 1000.'));
             }
             
             $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
@@ -179,44 +176,15 @@ class BogoManager
      * @param Quote $quote
      * @param int $productId
      */
-    private function mergeCartItems(Quote $quote, $productId)
+    private function getFreeItemsForProduct(Quote $quote, $productId)
     {
-        $items = $quote->getAllVisibleItems();
-        $firstItem = null;
-        $itemsToRemove = [];
-        $totalQty = 0;
-        
-        foreach ($items as $item) {
-            if ($item->getProductId() == $productId && !$item->getData('is_bogo_free')) {
-                $totalQty += $item->getQty();
-                if (!$firstItem) {
-                    $firstItem = $item;
-                } else {
-                    $itemsToRemove[] = $item;
-                }
+        $freeItems = [];
+        foreach ($quote->getAllVisibleItems() as $item) {
+            if ($item->getProductId() == $productId && $item->getData('is_bogo_free')) {
+                $freeItems[] = $item;
             }
         }
-        
-        // 检查总数量是否合理
-        if ($totalQty > 1000) {
-            throw new LocalizedException(__('The total quantity cannot exceed 1000.'));
-        }
-        
-        if ($firstItem) {
-            // 设置总数量
-            $firstItem->setQty($totalQty);
-            
-            // 移除其他项目
-            foreach ($itemsToRemove as $item) {
-                $quote->removeItem($item->getId());
-                $this->logger->debug('Merged and removed cart item', [
-                    'removed_item_id' => $item->getId(),
-                    'merged_into_item_id' => $firstItem->getId(),
-                    'original_qty' => $item->getQty(),
-                    'new_total_qty' => $totalQty
-                ]);
-            }
-        }
+        return $freeItems;
     }
 
     /**
