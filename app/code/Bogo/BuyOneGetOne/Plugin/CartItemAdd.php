@@ -7,6 +7,8 @@ use Bogo\BuyOneGetOne\Helper\Data;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
 use Magento\Quote\Model\Quote\ItemFactory;
+use Bogo\BuyOneGetOne\Model\BogoManager;
+use Bogo\BuyOneGetOne\Logger\Logger;
 
 class CartItemAdd
 {
@@ -31,21 +33,37 @@ class CartItemAdd
     private $itemFactory;
 
     /**
+     * @var BogoManager
+     */
+    private $bogoManager;
+
+    /**
+     * @var Logger
+     */
+    private $logger;
+
+    /**
      * @param Data $helper
      * @param ManagerInterface $messageManager
      * @param PricingHelper $priceHelper
      * @param ItemFactory $itemFactory
+     * @param BogoManager $bogoManager
+     * @param Logger $logger
      */
     public function __construct(
         Data $helper,
         ManagerInterface $messageManager,
         PricingHelper $priceHelper,
-        ItemFactory $itemFactory
+        ItemFactory $itemFactory,
+        BogoManager $bogoManager,
+        Logger $logger
     ) {
         $this->helper = $helper;
         $this->messageManager = $messageManager;
         $this->priceHelper = $priceHelper;
         $this->itemFactory = $itemFactory;
+        $this->bogoManager = $bogoManager;
+        $this->logger = $logger;
     }
 
     /**
@@ -62,40 +80,39 @@ class CartItemAdd
         }
 
         try {
+            $this->logger->debug('Processing afterAddProduct', [
+                'quote_id' => $subject->getId(),
+                'item_id' => $result->getId(),
+                'product_id' => $result->getProductId(),
+                'qty' => $result->getQty()
+            ]);
+
             $product = $result->getProduct();
             
             // 检查是否是BOGO商品
             if (!$product->getData('buy_one_get_one')) {
+                $this->logger->debug('Product is not BOGO eligible', [
+                    'product_id' => $product->getId()
+                ]);
                 return $result;
             }
 
             // 检查是否是免费商品（避免递归）
             if ($result->getData('is_bogo_free')) {
+                $this->logger->debug('Item is a free BOGO item, skipping', [
+                    'item_id' => $result->getId()
+                ]);
                 return $result;
             }
-
-            $maxFreeItems = $this->helper->getMaxFreeItems();
-            $productMaxFree = (float)$product->getData('bogo_max_free');
-            
-            // 计算应该赠送的数量
-            $maxFree = $productMaxFree > 0 ? 
-                ($maxFreeItems > 0 ? min($maxFreeItems, $productMaxFree) : $productMaxFree) : 
-                $maxFreeItems;
-            
-            $freeQty = $maxFree > 0 ? min($result->getQty(), $maxFree) : $result->getQty();
 
             // 使用BogoManager处理免费商品
             $this->bogoManager->processBogoForItem($subject, $result);
 
-            $formattedPrice = $this->priceHelper->currency($product->getFinalPrice(), true, false);
-            $this->messageManager->addSuccessMessage(
-                __('BOGO offer applied: Free %1 (worth %2) has been added!',
-                    $product->getName(),
-                    $formattedPrice
-                )
-            );
-
         } catch (\Exception $e) {
+            $this->logger->error('Error in afterAddProduct', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
         }
 
