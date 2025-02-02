@@ -13,13 +13,37 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 - Compatible with Magento 2.4.7
 - Supports PHP 8.2 and 8.3
 
+## Version History
+
+### v1.1.0 (Latest)
+- Major refactor: improved cart handling
+- Replaced observer with plugin for better performance
+- Fixed free item quantity synchronization
+- Improved handling of multiple cart updates
+
+### v1.0.2
+- Fixed free item quantity calculation
+- Added maximum items limit enforcement
+
+### v1.0.1
+- Fixed cart item addition issues
+- Improved error handling
+
+### v1.0.0
+- Initial stable release
+
 ## Installation
 
 ### Via Composer
 
-#### Install Stable Version
+#### Install Latest Stable Version (Recommended)
 ```bash
-composer require bogo/module-buyonegetone:^1.0.0
+composer require bogo/module-buyonegetone:^1.1.0
+```
+
+#### Install Specific Version
+```bash
+composer require bogo/module-buyonegetone:1.1.0
 ```
 
 #### Install Development Version
@@ -45,9 +69,9 @@ bin/magento setup:di:compile
 bin/magento cache:clean
 ```
 
-### Upgrade to Specific Version
+### Upgrade to Latest Version
 ```bash
-composer require bogo/module-buyonegetone:1.0.x
+composer require bogo/module-buyonegetone:^1.1.0
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento cache:clean
