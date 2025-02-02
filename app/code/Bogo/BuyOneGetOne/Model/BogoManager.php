@@ -8,6 +8,7 @@ use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
 use Magento\Quote\Model\Quote\ItemFactory;
 use Bogo\BuyOneGetOne\Helper\Data;
+use Bogo\BuyOneGetOne\Logger\Logger;
 
 class BogoManager
 {
@@ -32,21 +33,29 @@ class BogoManager
     private $itemFactory;
 
     /**
+     * @var Logger
+     */
+    private $logger;
+
+    /**
      * @param Data $helper
      * @param ManagerInterface $messageManager
      * @param PricingHelper $priceHelper
      * @param ItemFactory $itemFactory
+     * @param Logger $logger
      */
     public function __construct(
         Data $helper,
         ManagerInterface $messageManager,
         PricingHelper $priceHelper,
-        ItemFactory $itemFactory
+        ItemFactory $itemFactory,
+        Logger $logger
     ) {
         $this->helper = $helper;
         $this->messageManager = $messageManager;
         $this->priceHelper = $priceHelper;
         $this->itemFactory = $itemFactory;
+        $this->logger = $logger;
     }
 
     /**
@@ -58,18 +67,37 @@ class BogoManager
      */
     public function processBogoForItem(Quote $quote, Item $quoteItem)
     {
+        $this->logger->debug('Processing BOGO for item', [
+            'quote_id' => $quote->getId(),
+            'item_id' => $quoteItem->getId(),
+            'product_id' => $quoteItem->getProductId(),
+            'qty' => $quoteItem->getQty(),
+            'is_bogo_free' => $quoteItem->getData('is_bogo_free'),
+            'is_enabled' => $this->helper->isEnabled()
+        ]);
+
         if (!$this->helper->isEnabled() || $quoteItem->getData('is_bogo_free')) {
+            $this->logger->debug('Skipping BOGO processing', [
+                'reason' => !$this->helper->isEnabled() ? 'module_disabled' : 'is_free_item'
+            ]);
             return;
         }
 
         $product = $quoteItem->getProduct();
         if (!$product->getData('buy_one_get_one')) {
+            $this->logger->debug('Product is not BOGO eligible', [
+                'product_id' => $product->getId()
+            ]);
             return;
         }
 
         try {
             $this->updateBogoItemsForProduct($quote, $quoteItem);
         } catch (\Exception $e) {
+            $this->logger->error('Error processing BOGO', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->messageManager->addErrorMessage(__('Unable to apply BOGO offer. Please try again.'));
         }
     }
@@ -93,8 +121,20 @@ class BogoManager
             return $item->getQty();
         }, $freeItems));
 
+        $this->logger->debug('Updating BOGO items', [
+            'product_id' => $productId,
+            'paid_qty' => $paidQty,
+            'expected_free_qty' => $expectedFreeQty,
+            'current_free_qty' => $currentFreeQty,
+            'free_items_count' => count($freeItems)
+        ]);
+
         // 如果数量不一致，更新免费商品
         if ($expectedFreeQty !== $currentFreeQty) {
+            $this->logger->debug('Updating free items quantity', [
+                'from' => $currentFreeQty,
+                'to' => $expectedFreeQty
+            ]);
             $this->updateFreeItems($quote, $paidItem, $expectedFreeQty, $freeItems);
         }
     }
