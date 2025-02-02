@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="bogo_promotion_rule" resource="default" engine="innodb" comment="Promotion Rules">
+        <column xsi:type="int" name="rule_id" padding="10" unsigned="true" nullable="false" identity="true"
+                comment="Rule ID"/>
+        <column xsi:type="varchar" name="name" nullable="false" length="255" comment="Rule Name"/>
+        <column xsi:type="text" name="description" nullable="true" comment="Rule Description"/>
+        <column xsi:type="smallint" name="is_active" padding="5" unsigned="true" nullable="false" default="1"
+                comment="Is Rule Active"/>
+        <column xsi:type="text" name="conditions" nullable="true" comment="Rule Conditions"/>
+        <column xsi:type="varchar" name="action_type" nullable="false" length="50" 
+                comment="Action Type (buy_x_get_y, buy_x_get_x)"/>
+        <column xsi:type="int" name="buy_x_qty" padding="10" unsigned="true" nullable="false" default="1"
+                comment="Quantity Required to Buy"/>
+        <column xsi:type="int" name="get_y_qty" padding="10" unsigned="true" nullable="false" default="1"
+                comment="Quantity to Get"/>
+        <column xsi:type="varchar" name="buy_x_sku" nullable="true" length="64" comment="SKU to Buy"/>
+        <column xsi:type="varchar" name="get_y_sku" nullable="true" length="64" comment="SKU to Get"/>
+        <column xsi:type="varchar" name="discount_type" nullable="false" length="20" default="free"
+                comment="Discount Type (percent, fixed, free)"/>
+        <column xsi:type="decimal" name="discount_amount" scale="4" precision="12" unsigned="false" nullable="true"
+                comment="Discount Amount"/>
+        <column xsi:type="int" name="max_y_items" padding="10" unsigned="true" nullable="true"
+                comment="Maximum Items to Get"/>
+        <column xsi:type="int" name="priority" padding="10" unsigned="true" nullable="false" default="0"
+                comment="Rule Priority"/>
+        <column xsi:type="text" name="store_ids" nullable="true" comment="Store IDs"/>
+        <column xsi:type="text" name="customer_group_ids" nullable="true" comment="Customer Group IDs"/>
+        <column xsi:type="timestamp" name="from_date" nullable="true" comment="From Date"/>
+        <column xsi:type="timestamp" name="to_date" nullable="true" comment="To Date"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Creation Time"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP"
+                on_update="true" comment="Update Time"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="rule_id"/>
+        </constraint>
+    </table>
+    <table name="bogo_promotion_rule_product" resource="default" engine="innodb" comment="Promotion Rule Products">
+        <column xsi:type="int" name="rule_id" padding="10" unsigned="true" nullable="false" comment="Rule ID"/>
+        <column xsi:type="int" name="product_id" padding="10" unsigned="true" nullable="false" 
+                comment="Product ID"/>
+        <column xsi:type="varchar" name="product_type" nullable="false" length="1" default="x"
+                comment="Product Type (x for buy, y for get)"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="rule_id"/>
+            <column name="product_id"/>
+            <column name="product_type"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="BOGO_PROM_RULE_PRD_RULE_ID_BOGO_PROM_RULE_RULE_ID"
+                   table="bogo_promotion_rule_product" column="rule_id" referenceTable="bogo_promotion_rule"
+                   referenceColumn="rule_id" onDelete="CASCADE"/>
+    </table>
+</schema>

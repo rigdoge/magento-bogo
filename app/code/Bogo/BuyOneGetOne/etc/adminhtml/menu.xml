@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Bogo_BuyOneGetOne::promotion"
+             title="Buy X Get Y"
+             translate="title"
+             module="Bogo_BuyOneGetOne"
+             sortOrder="50"
+             parent="Magento_Backend::marketing"
+             resource="Bogo_BuyOneGetOne::promotion"/>
+             
+        <add id="Bogo_BuyOneGetOne::promotion_rules"
+             title="Promotion Rules"
+             translate="title"
+             module="Bogo_BuyOneGetOne"
+             sortOrder="10"
+             parent="Bogo_BuyOneGetOne::promotion"
+             action="bogo/rule/index"
+             resource="Bogo_BuyOneGetOne::promotion_rules"/>
+    </menu>
+</config>

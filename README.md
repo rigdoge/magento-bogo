@@ -13,6 +13,69 @@ This module adds Buy One Get One Free (BOGO) functionality to your Magento 2.4.7
 - Compatible with Magento 2.4.7
 - Supports PHP 8.2 and 8.3
 
+## Installation
+
+### 1. Using Composer (Recommended)
+
+在你的 Magento 项目的根目录下运行：
+
+```bash
+# 方法 1：直接安装（推荐）
+composer require bogo/module-buyonegetone
+
+# 方法 2：如果需要指定版本
+composer require bogo/module-buyonegetone:1.1.2
+
+# 方法 3：如果遇到冲突，可以先添加依赖再更新
+composer require bogo/module-buyonegetone --no-update
+composer update bogo/module-buyonegetone --with-dependencies
+```
+
+注意：
+- 确保你的 `composer.json` 中已经配置了 `https://repo.magento.com/`
+- 如果安装特定版本，建议使用最新的稳定版本（当前是 1.1.2）
+
+### 2. Enable the Module
+
+After installation, enable the module by running:
+
+```bash
+bin/magento module:enable Bogo_BuyOneGetOne
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:clean
+```
+
+### Version Compatibility
+
+| Magento Version | Module Version | PHP Version |
+|-----------------|----------------|-------------|
+| 2.4.7          | 1.1.x          | 8.2, 8.3   |
+
+### Troubleshooting
+
+If you encounter any issues during installation:
+
+1. Clear the cache:
+   ```bash
+   bin/magento cache:flush
+   ```
+
+2. If you see composer conflicts, try:
+   ```bash
+   # 只更新 BOGO 模块和其依赖
+   composer update bogo/module-buyonegetone --with-dependencies
+   
+   # 或者清理 composer 缓存后重试
+   composer clearcache
+   composer require bogo/module-buyonegetone
+   ```
+
+3. For permission issues:
+   ```bash
+   chmod -R 777 var/ generated/ pub/static/
+   ```
+
 ## Version History
 
 ### v1.1.2 (Latest)
