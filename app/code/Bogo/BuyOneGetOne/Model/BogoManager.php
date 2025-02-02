@@ -179,6 +179,11 @@ class BogoManager
                 $totalQty += $item->getQty();
             }
         }
+        $this->logger->debug('Calculated total paid quantity', [
+            'product_id' => $productId,
+            'total_qty' => $totalQty,
+            'quote_id' => $quote->getId()
+        ]);
         return $totalQty;
     }
 
@@ -209,6 +214,9 @@ class BogoManager
      */
     private function calculateExpectedFreeQty($paidQty, $product)
     {
+        // 计算基础免费数量：每两个付费商品送一个
+        $baseFreeQty = floor($paidQty / 2);
+        
         $globalMaxFree = $this->helper->getMaxFreeItems();
         $productMaxFree = (float)$product->getData('bogo_max_free');
         
@@ -216,7 +224,17 @@ class BogoManager
             ($globalMaxFree > 0 ? min($globalMaxFree, $productMaxFree) : $productMaxFree) : 
             $globalMaxFree;
         
-        return $maxFree > 0 ? min($paidQty, $maxFree) : $paidQty;
+        $finalFreeQty = $maxFree > 0 ? min($baseFreeQty, $maxFree) : $baseFreeQty;
+        
+        $this->logger->debug('Calculated expected free quantity', [
+            'paid_qty' => $paidQty,
+            'base_free_qty' => $baseFreeQty,
+            'global_max_free' => $globalMaxFree,
+            'product_max_free' => $productMaxFree,
+            'final_free_qty' => $finalFreeQty
+        ]);
+        
+        return $finalFreeQty;
     }
 
     /**
@@ -230,10 +248,20 @@ class BogoManager
      */
     private function updateFreeItems(Quote $quote, Item $paidItem, $expectedFreeQty, array $existingFreeItems)
     {
+        $this->logger->debug('Updating free items', [
+            'expected_qty' => $expectedFreeQty,
+            'existing_items' => count($existingFreeItems),
+            'quote_id' => $quote->getId(),
+            'paid_item_id' => $paidItem->getId()
+        ]);
+
         // 如果不需要免费商品，删除所有现有的
         if ($expectedFreeQty <= 0) {
             foreach ($existingFreeItems as $item) {
                 $quote->removeItem($item->getId());
+                $this->logger->debug('Removed free item', [
+                    'item_id' => $item->getId()
+                ]);
             }
             return;
         }
@@ -241,10 +269,20 @@ class BogoManager
         // 如果已有免费商品，更新第一个，删除其他的
         if (!empty($existingFreeItems)) {
             $freeItem = array_shift($existingFreeItems);
+            $oldQty = $freeItem->getQty();
             $freeItem->setQty($expectedFreeQty);
+            
+            $this->logger->debug('Updated existing free item', [
+                'item_id' => $freeItem->getId(),
+                'old_qty' => $oldQty,
+                'new_qty' => $expectedFreeQty
+            ]);
             
             foreach ($existingFreeItems as $item) {
                 $quote->removeItem($item->getId());
+                $this->logger->debug('Removed extra free item', [
+                    'item_id' => $item->getId()
+                ]);
             }
         } else {
             // 如果没有免费商品，创建新的
