@@ -146,29 +146,35 @@ class BogoManager
             
             $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
         
-        // 获取当前的免费商品
-        $freeItems = $this->getFreeItemsForProduct($quote, $productId);
-        $currentFreeQty = array_sum(array_map(function($item) {
-            return $item->getQty();
-        }, $freeItems));
+            // 获取当前的免费商品
+            $freeItems = $this->getFreeItemsForProduct($quote, $productId);
+            $currentFreeQty = array_sum(array_map(function($item) {
+                return $item->getQty();
+            }, $freeItems));
 
-        $this->logger->debug('Updating BOGO items', [
-            'product_id' => $productId,
-            'paid_qty' => $paidQty,
-            'expected_free_qty' => $expectedFreeQty,
-            'current_free_qty' => $currentFreeQty,
-            'free_items_count' => count($freeItems)
-        ]);
-
-        // 如果数量不一致，更新免费商品
-        if ($expectedFreeQty !== $currentFreeQty) {
-            $this->logger->debug('Updating free items quantity', [
-                'from' => $currentFreeQty,
-                'to' => $expectedFreeQty
+            $this->logger->debug('Updating BOGO items', [
+                'product_id' => $productId,
+                'paid_qty' => $paidQty,
+                'expected_free_qty' => $expectedFreeQty,
+                'current_free_qty' => $currentFreeQty,
+                'free_items_count' => count($freeItems)
             ]);
-            $this->updateFreeItems($quote, $paidItem, $expectedFreeQty, $freeItems);
+
+            // 如果数量不一致，更新免费商品
+            if ($expectedFreeQty !== $currentFreeQty) {
+                $this->logger->debug('Updating free items quantity', [
+                    'from' => $currentFreeQty,
+                    'to' => $expectedFreeQty
+                ]);
+                $this->updateFreeItems($quote, $paidItem, $expectedFreeQty, $freeItems);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Error in updateBogoItemsForProduct', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-    }
     
 
 
