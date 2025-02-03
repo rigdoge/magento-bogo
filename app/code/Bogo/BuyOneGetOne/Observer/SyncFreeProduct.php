@@ -41,7 +41,7 @@ class SyncFreeProduct implements ObserverInterface
 
     /**
      * Synchronize free product quantity with its paid product.
-     * For each paid product that is eligible for BOGO, ensure there is a corresponding free product with the same quantity.
+     * Only update quantity of existing free products, don't add new ones.
      * 
      * @param Observer $observer
      */
@@ -58,32 +58,18 @@ class SyncFreeProduct implements ObserverInterface
                 if ($item->getPrice() > 0 && $item->getProduct()->getData('buy_one_get_one')) {
                     $productId = $item->getProductId();
                     $paidQty = $item->getQty();
-                    $freeItem = null;
 
-                    // Search for corresponding free item
+                    // Only update existing free items, don't create new ones
                     foreach ($quote->getAllItems() as $qItem) {
                         if ($qItem->getProductId() == $productId &&
                             $qItem->getData('is_bogo_free') &&
                             $qItem->getPrice() == 0) {
-                            $freeItem = $qItem;
+                            // Update quantity if different
+                            if ($qItem->getQty() != $paidQty) {
+                                $qItem->setQty($paidQty);
+                            }
                             break;
                         }
-                    }
-
-                    if ($freeItem) {
-                        if ($freeItem->getQty() != $paidQty) {
-                            $freeItem->setQty($paidQty);
-                        }
-                    } else {
-                        // If free item does not exist, create one
-                        $freeItem = $this->itemFactory->create();
-                        $freeItem->setProduct($item->getProduct())
-                            ->setQuote($quote)
-                            ->setQty($paidQty)
-                            ->setCustomPrice(0)
-                            ->setOriginalCustomPrice(0)
-                            ->setData('is_bogo_free', 1);
-                        $quote->addItem($freeItem);
                     }
                 }
             }
