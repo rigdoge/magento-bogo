@@ -99,23 +99,6 @@ class BogoManager
             return;
         }
 
-        // 修改跟踪键值，只使用购物车ID和商品ID的组合
-        $itemKey = $quote->getId() . '_' . $quoteItem->getProductId();
-        
-        // 获取当前商品的总付费数量
-        $totalPaidQty = $this->getTotalPaidQtyForProduct($quote, $quoteItem->getProductId());
-        
-        // 如果已处理过此商品，且数量没有变化，则跳过
-        if (isset(self::$processedItems[$itemKey])) {
-            if (self::$processedItems[$itemKey] === $totalPaidQty) {
-                $this->logger->debug('Item already processed with same quantity', [
-                    'item_key' => $itemKey,
-                    'total_paid_qty' => $totalPaidQty
-                ]);
-                return;
-            }
-        }
-
         try {
             // 重新加载产品以确保所有属性都被加载
             $product = $this->productRepository->getById($quoteItem->getProductId());
@@ -135,9 +118,6 @@ class BogoManager
 
             // 更新购物车中的BOGO商品
             $this->updateBogoItemsForProduct($quote, $quoteItem);
-            
-            // 更新处理记录
-            self::$processedItems[$itemKey] = $totalPaidQty;
             
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
@@ -165,30 +145,34 @@ class BogoManager
                 throw new LocalizedException(__('The quantity cannot exceed 1000.'));
             }
             
+            // 只使用本次添加的商品数量计算免费商品数量
             $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
         
             // 获取当前的免费商品
             $freeItems = $this->getFreeItemsForProduct($quote, $productId);
-            $currentFreeQty = array_sum(array_map(function($item) {
-                return $item->getQty();
-            }, $freeItems));
+            
+            // 如果已经存在免费商品，更新数量
+            if (!empty($freeItems)) {
+                $freeItem = reset($freeItems); // 获取第一个免费商品
+                $freeItem->setQty($expectedFreeQty);
+                
+                // 删除多余的免费商品
+                $count = 0;
+                foreach ($freeItems as $item) {
+                    if ($count++ > 0) { // 跳过第一个
+                        $quote->removeItem($item->getId());
+                    }
+                }
+            } else {
+                // 如果没有免费商品，创建新的
+                $this->createFreeItem($quote, $paidItem, $expectedFreeQty);
+            }
 
-            $this->logger->debug('Updating BOGO items', [
+            $this->logger->debug('Updated BOGO items', [
                 'product_id' => $productId,
                 'paid_qty' => $paidQty,
-                'expected_free_qty' => $expectedFreeQty,
-                'current_free_qty' => $currentFreeQty,
-                'free_items_count' => count($freeItems)
+                'free_qty' => $expectedFreeQty
             ]);
-
-            // 如果数量不一致，更新免费商品
-            if ($expectedFreeQty !== $currentFreeQty) {
-                $this->logger->debug('Updating free items quantity', [
-                    'from' => $currentFreeQty,
-                    'to' => $expectedFreeQty
-                ]);
-                $this->updateFreeItems($quote, $paidItem, $expectedFreeQty, $freeItems);
-            }
         } catch (\Exception $e) {
             $this->logger->error('Error in updateBogoItemsForProduct', [
                 'error' => $e->getMessage(),
@@ -304,59 +288,6 @@ class BogoManager
         ]);
         
         return $finalFreeQty;
-    }
-
-    /**
-     * Update free items
-     *
-     * @param Quote $quote
-     * @param Item $paidItem
-     * @param float $expectedFreeQty
-     * @param array $existingFreeItems
-     * @return void
-     */
-    private function updateFreeItems(Quote $quote, Item $paidItem, $expectedFreeQty, array $existingFreeItems): void
-    {
-        $this->logger->debug('Updating free items', [
-            'expected_qty' => $expectedFreeQty,
-            'existing_items' => count($existingFreeItems),
-            'quote_id' => $quote->getId(),
-            'paid_item_id' => $paidItem->getId()
-        ]);
-
-        // 如果不需要免费商品，删除所有现有的
-        if ($expectedFreeQty <= 0) {
-            foreach ($existingFreeItems as $item) {
-                $quote->removeItem($item->getId());
-                $this->logger->debug('Removed free item', [
-                    'item_id' => $item->getId()
-                ]);
-            }
-            return;
-        }
-
-        // 如果已有免费商品，更新第一个，删除其他的
-        if (!empty($existingFreeItems)) {
-            $freeItem = array_shift($existingFreeItems);
-            $oldQty = $freeItem->getQty();
-            $freeItem->setQty($expectedFreeQty);
-            
-            $this->logger->debug('Updated existing free item', [
-                'item_id' => $freeItem->getId(),
-                'old_qty' => $oldQty,
-                'new_qty' => $expectedFreeQty
-            ]);
-            
-            foreach ($existingFreeItems as $item) {
-                $quote->removeItem($item->getId());
-                $this->logger->debug('Removed extra free item', [
-                    'item_id' => $item->getId()
-                ]);
-            }
-        } else {
-            // 如果没有免费商品，创建新的
-            $this->createFreeItem($quote, $paidItem, $expectedFreeQty);
-        }
     }
 
     /**
