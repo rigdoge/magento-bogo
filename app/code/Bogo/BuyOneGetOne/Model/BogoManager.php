@@ -83,10 +83,13 @@ class BogoManager
             'qty' => $quoteItem->getQty()
         ]);
 
-        if (!$this->helper->isEnabled() || $quoteItem->getData('is_bogo_free')) {
-            $this->logger->debug('Skipping BOGO processing', [
-                'reason' => !$this->helper->isEnabled() ? 'module_disabled' : 'is_free_item'
-            ]);
+        if (!$this->helper->isEnabled()) {
+            $this->logger->debug('BOGO module is disabled');
+            return;
+        }
+
+        if ($quoteItem->getData('is_bogo_free')) {
+            $this->logger->debug('Skipping BOGO free item');
             return;
         }
 
@@ -101,8 +104,8 @@ class BogoManager
                 return;
             }
 
-            // 更新购物车中的BOGO商品
-            $this->updateBogoItemsForProduct($quote, $quoteItem);
+            // 同步所有 BOGO 商品
+            $this->syncBogoItems($quote);
             
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
@@ -114,106 +117,78 @@ class BogoManager
     }
 
     /**
-     * Update BOGO items for a specific product
+     * Synchronize all BOGO items in the cart
      *
      * @param Quote $quote
-     * @param Item $paidItem
      * @return void
      */
-    private function updateBogoItemsForProduct(Quote $quote, Item $paidItem): void
+    private function syncBogoItems(Quote $quote): void
     {
         try {
-            $productId = $paidItem->getProductId();
+            $bogoProducts = [];
             
-            // 获取购物车中该商品的所有付费商品总数
-            $totalPaidQty = $this->getTotalPaidQtyForProduct($quote, $productId);
-            
-            if ($totalPaidQty > 1000) {
-                throw new LocalizedException(__('The quantity cannot exceed 1000.'));
-            }
-
-            // 获取当前的免费商品
-            $freeItems = $this->getFreeItemsForProduct($quote, $productId);
-            
-            // 计算应该添加的免费商品数量
-            $expectedFreeQty = $this->calculateExpectedFreeQty($totalPaidQty, $paidItem->getProduct());
-            
-            if (!empty($freeItems)) {
-                // 如果已经存在免费商品，更新第一个免费商品的数量，删除其他的
-                $freeItem = reset($freeItems);
-                $freeItem->setQty($expectedFreeQty);
-                
-                // 删除多余的免费商品
-                $count = 0;
-                foreach ($freeItems as $item) {
-                    if ($count++ > 0) {
-                        $quote->removeItem($item->getId());
+            // 第一步：收集所有 BOGO 商品信息
+            foreach ($quote->getAllVisibleItems() as $item) {
+                if (!$item->getData('is_bogo_free')) {
+                    $product = $item->getProduct();
+                    if ($product->getData('buy_one_get_one') || $product->getBuyOneGetOne()) {
+                        $productId = $item->getProductId();
+                        if (!isset($bogoProducts[$productId])) {
+                            $bogoProducts[$productId] = [
+                                'paid_qty' => 0,
+                                'product' => $product,
+                                'free_items' => []
+                            ];
+                        }
+                        $bogoProducts[$productId]['paid_qty'] += $item->getQty();
                     }
                 }
-                
-                $this->logger->debug('Updated existing free item', [
-                    'item_id' => $freeItem->getId(),
-                    'new_qty' => $expectedFreeQty
-                ]);
-            } else {
-                // 如果没有免费商品，创建新的
-                $this->createFreeItem($quote, $paidItem, $expectedFreeQty);
             }
-
-            $this->logger->debug('Updated BOGO items', [
-                'product_id' => $productId,
-                'total_paid_qty' => $totalPaidQty,
-                'free_qty' => $expectedFreeQty
-            ]);
+            
+            // 第二步：收集免费商品信息
+            foreach ($quote->getAllItems() as $item) {
+                if ($item->getData('is_bogo_free')) {
+                    $productId = $item->getProductId();
+                    if (isset($bogoProducts[$productId])) {
+                        $bogoProducts[$productId]['free_items'][] = $item;
+                    }
+                }
+            }
+            
+            // 第三步：更新或创建免费商品
+            foreach ($bogoProducts as $productId => $data) {
+                $expectedFreeQty = $this->calculateExpectedFreeQty($data['paid_qty'], $data['product']);
+                
+                if (!empty($data['free_items'])) {
+                    // 更新第一个免费商品，删除其他的
+                    $freeItem = reset($data['free_items']);
+                    $freeItem->setQty($expectedFreeQty);
+                    
+                    $count = 0;
+                    foreach ($data['free_items'] as $item) {
+                        if ($count++ > 0) {
+                            $quote->removeItem($item->getId());
+                        }
+                    }
+                    
+                    $this->logger->debug('Updated free item', [
+                        'product_id' => $productId,
+                        'paid_qty' => $data['paid_qty'],
+                        'free_qty' => $expectedFreeQty
+                    ]);
+                } else if ($expectedFreeQty > 0) {
+                    // 创建新的免费商品
+                    $this->createFreeItem($quote, $data['product'], $expectedFreeQty);
+                }
+            }
             
         } catch (\Exception $e) {
-            $this->logger->error('Error in updateBogoItemsForProduct', [
+            $this->logger->error('Error in syncBogoItems', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
-    }
-
-    /**
-     * Get total paid quantity for a product in the cart
-     *
-     * @param Quote $quote
-     * @param int $productId
-     * @return float
-     */
-    private function getTotalPaidQtyForProduct(Quote $quote, $productId): float
-    {
-        $totalQty = 0;
-        foreach ($quote->getAllVisibleItems() as $item) {
-            if ($item->getProductId() == $productId && !$item->getData('is_bogo_free')) {
-                $totalQty += $item->getQty();
-                $this->logger->debug('Found paid item', [
-                    'item_id' => $item->getId(),
-                    'qty' => $item->getQty(),
-                    'running_total' => $totalQty
-                ]);
-            }
-        }
-        return $totalQty;
-    }
-
-    /**
-     * Get all free items for a product
-     *
-     * @param Quote $quote
-     * @param int $productId
-     * @return Item[]
-     */
-    private function getFreeItemsForProduct(Quote $quote, $productId): array
-    {
-        $freeItems = [];
-        foreach ($quote->getAllItems() as $item) {
-            if ($item->getProductId() == $productId && $item->getData('is_bogo_free')) {
-                $freeItems[] = $item;
-            }
-        }
-        return $freeItems;
     }
 
     /**
@@ -225,6 +200,10 @@ class BogoManager
      */
     private function calculateExpectedFreeQty($paidQty, $product): float
     {
+        if ($paidQty <= 0) {
+            return 0;
+        }
+
         // 计算基础免费数量：每个付费商品送一个
         $baseFreeQty = $paidQty;
         
@@ -237,7 +216,7 @@ class BogoManager
         
         $finalFreeQty = $maxFree > 0 ? min($baseFreeQty, $maxFree) : $baseFreeQty;
         
-        $this->logger->debug('Calculated expected free quantity', [
+        $this->logger->debug('Calculated free quantity', [
             'paid_qty' => $paidQty,
             'base_free_qty' => $baseFreeQty,
             'global_max_free' => $globalMaxFree,
@@ -252,14 +231,14 @@ class BogoManager
      * Create new free item
      *
      * @param Quote $quote
-     * @param Item $paidItem
+     * @param \Magento\Catalog\Model\Product $product
      * @param float $freeQty
      * @return void
      */
-    private function createFreeItem(Quote $quote, Item $paidItem, $freeQty): void
+    private function createFreeItem(Quote $quote, $product, $freeQty): void
     {
         $freeItem = $this->itemFactory->create();
-        $freeItem->setProduct($paidItem->getProduct())
+        $freeItem->setProduct($product)
             ->setQty($freeQty)
             ->setCustomPrice(0)
             ->setOriginalCustomPrice(0)
@@ -281,16 +260,16 @@ class BogoManager
 
         $this->logger->debug('Creating free item', [
             'quote_id' => $quote->getId(),
-            'product_id' => $paidItem->getProduct()->getId(),
+            'product_id' => $product->getId(),
             'qty' => $freeQty
         ]);
 
         $quote->addItem($freeItem);
 
-        $formattedPrice = $this->priceHelper->currency($paidItem->getProduct()->getFinalPrice(), true, false);
+        $formattedPrice = $this->priceHelper->currency($product->getFinalPrice(), true, false);
         $this->messageManager->addSuccessMessage(
             __('BOGO offer applied: Free %1 (worth %2) has been added!',
-                $paidItem->getProduct()->getName(),
+                $product->getName(),
                 $formattedPrice
             )
         );
