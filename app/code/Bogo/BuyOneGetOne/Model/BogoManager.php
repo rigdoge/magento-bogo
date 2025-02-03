@@ -15,7 +15,7 @@ class BogoManager
 {
     /**
      * Store processed items to prevent duplicate processing
-     *
+     * Key: quote_id_product_id
      * @var array
      */
     private static $processedItems = [];
@@ -99,13 +99,21 @@ class BogoManager
             return;
         }
 
-        // 检查是否已处理过此商品
-        $itemKey = $quoteItem->getProductId() . '_' . $quoteItem->getQty();
+        // 修改跟踪键值，只使用购物车ID和商品ID的组合
+        $itemKey = $quote->getId() . '_' . $quoteItem->getProductId();
+        
+        // 获取当前商品的总付费数量
+        $totalPaidQty = $this->getTotalPaidQtyForProduct($quote, $quoteItem->getProductId());
+        
+        // 如果已处理过此商品，且数量没有变化，则跳过
         if (isset(self::$processedItems[$itemKey])) {
-            $this->logger->debug('Item already processed', [
-                'item_key' => $itemKey
-            ]);
-            return;
+            if (self::$processedItems[$itemKey] === $totalPaidQty) {
+                $this->logger->debug('Item already processed with same quantity', [
+                    'item_key' => $itemKey,
+                    'total_paid_qty' => $totalPaidQty
+                ]);
+                return;
+            }
         }
 
         try {
@@ -124,19 +132,13 @@ class BogoManager
                 ]);
                 return;
             }
-        } catch (\Exception $e) {
-            $this->logger->error('Error loading product', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return;
-        }
 
-        try {
+            // 更新购物车中的BOGO商品
             $this->updateBogoItemsForProduct($quote, $quoteItem);
             
-            // 标记此商品已处理
-            self::$processedItems[$itemKey] = true;
+            // 更新处理记录
+            self::$processedItems[$itemKey] = $totalPaidQty;
+            
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
                 'error' => $e->getMessage(),
