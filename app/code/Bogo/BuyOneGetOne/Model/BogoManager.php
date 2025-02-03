@@ -126,6 +126,7 @@ class BogoManager
     {
         try {
             $bogoProducts = [];
+            $itemsToRemove = [];
             
             // 第一步：收集所有 BOGO 商品信息
             foreach ($quote->getAllVisibleItems() as $item) {
@@ -151,8 +152,16 @@ class BogoManager
                     $productId = $item->getProductId();
                     if (isset($bogoProducts[$productId])) {
                         $bogoProducts[$productId]['free_items'][] = $item;
+                    } else {
+                        // 如果找不到对应的付费商品，标记为删除
+                        $itemsToRemove[] = $item->getId();
                     }
                 }
+            }
+            
+            // 删除不需要的免费商品
+            foreach ($itemsToRemove as $itemId) {
+                $quote->removeItem($itemId);
             }
             
             // 第三步：更新或创建免费商品
@@ -162,25 +171,37 @@ class BogoManager
                 if (!empty($data['free_items'])) {
                     // 更新第一个免费商品，删除其他的
                     $freeItem = reset($data['free_items']);
-                    $freeItem->setQty($expectedFreeQty);
                     
-                    $count = 0;
-                    foreach ($data['free_items'] as $item) {
-                        if ($count++ > 0) {
+                    if ($expectedFreeQty > 0) {
+                        $freeItem->setQty($expectedFreeQty);
+                        
+                        // 删除多余的免费商品
+                        $count = 0;
+                        foreach ($data['free_items'] as $item) {
+                            if ($count++ > 0) {
+                                $quote->removeItem($item->getId());
+                            }
+                        }
+                        
+                        $this->logger->debug('Updated free item', [
+                            'product_id' => $productId,
+                            'paid_qty' => $data['paid_qty'],
+                            'free_qty' => $expectedFreeQty
+                        ]);
+                    } else {
+                        // 如果不需要免费商品，删除所有免费商品
+                        foreach ($data['free_items'] as $item) {
                             $quote->removeItem($item->getId());
                         }
                     }
-                    
-                    $this->logger->debug('Updated free item', [
-                        'product_id' => $productId,
-                        'paid_qty' => $data['paid_qty'],
-                        'free_qty' => $expectedFreeQty
-                    ]);
                 } else if ($expectedFreeQty > 0) {
                     // 创建新的免费商品
                     $this->createFreeItem($quote, $data['product'], $expectedFreeQty);
                 }
             }
+            
+            // 保存购物车
+            $quote->collectTotals()->save();
             
         } catch (\Exception $e) {
             $this->logger->error('Error in syncBogoItems', [
