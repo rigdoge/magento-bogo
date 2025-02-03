@@ -2,7 +2,7 @@
     "name": "bogo/module-buyonegetone",
     "description": "Buy One Get One Free module for Magento 2",
     "type": "magento2-module",
-    "version": "1.5.1",
+    "version": "1.5.1.0",
     "keywords": [
         "magento2",
         "magento2-module",
