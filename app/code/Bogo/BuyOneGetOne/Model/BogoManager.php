@@ -14,6 +14,13 @@ use Bogo\BuyOneGetOne\Logger\Logger;
 class BogoManager
 {
     /**
+     * Store processed items to prevent duplicate processing
+     *
+     * @var array
+     */
+    private static $processedItems = [];
+
+    /**
      * @var Data
      */
     private $helper;
@@ -92,6 +99,15 @@ class BogoManager
             return;
         }
 
+        // 检查是否已处理过此商品
+        $itemKey = $quoteItem->getProductId() . '_' . $quoteItem->getQty();
+        if (isset(self::$processedItems[$itemKey])) {
+            $this->logger->debug('Item already processed', [
+                'item_key' => $itemKey
+            ]);
+            return;
+        }
+
         try {
             // 重新加载产品以确保所有属性都被加载
             $product = $this->productRepository->getById($quoteItem->getProductId());
@@ -118,6 +134,9 @@ class BogoManager
 
         try {
             $this->updateBogoItemsForProduct($quote, $quoteItem);
+            
+            // 标记此商品已处理
+            self::$processedItems[$itemKey] = true;
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
                 'error' => $e->getMessage(),
