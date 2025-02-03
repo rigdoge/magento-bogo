@@ -139,13 +139,14 @@ class BogoManager
     {
         try {
             $productId = $paidItem->getProductId();
+            // 使用本次添加的商品数量
             $paidQty = $paidItem->getQty();
             
             if ($paidQty > 1000) {
                 throw new LocalizedException(__('The quantity cannot exceed 1000.'));
             }
             
-            // 只使用本次添加的商品数量计算免费商品数量
+            // 计算本次应该添加的免费商品数量
             $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
         
             // 获取当前的免费商品
@@ -154,7 +155,11 @@ class BogoManager
             // 如果已经存在免费商品，更新数量
             if (!empty($freeItems)) {
                 $freeItem = reset($freeItems); // 获取第一个免费商品
-                $freeItem->setQty($expectedFreeQty);
+                $currentFreeQty = $freeItem->getQty();
+                
+                // 累加免费商品数量
+                $newFreeQty = $currentFreeQty + $expectedFreeQty;
+                $freeItem->setQty($newFreeQty);
                 
                 // 删除多余的免费商品
                 $count = 0;
@@ -163,6 +168,13 @@ class BogoManager
                         $quote->removeItem($item->getId());
                     }
                 }
+                
+                $this->logger->debug('Updated existing free item', [
+                    'item_id' => $freeItem->getId(),
+                    'old_qty' => $currentFreeQty,
+                    'added_qty' => $expectedFreeQty,
+                    'new_qty' => $newFreeQty
+                ]);
             } else {
                 // 如果没有免费商品，创建新的
                 $this->createFreeItem($quote, $paidItem, $expectedFreeQty);
