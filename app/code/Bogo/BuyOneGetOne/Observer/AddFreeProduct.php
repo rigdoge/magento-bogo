@@ -25,6 +25,13 @@ class AddFreeProduct implements ObserverInterface
     protected $bogoHelper;
 
     /**
+     * Store processed items to prevent duplicate processing
+     *
+     * @var array
+     */
+    protected static $processedItems = [];
+
+    /**
      * @param ItemFactory $itemFactory
      * @param ManagerInterface $messageManager
      * @param BogoHelper $bogoHelper
@@ -59,6 +66,12 @@ class AddFreeProduct implements ObserverInterface
 
             // 如果是免费商品，直接返回
             if ($item->getData('is_bogo_free')) {
+                return;
+            }
+
+            // 检查是否已处理过此商品
+            $itemKey = $item->getProductId() . '_' . $item->getQty();
+            if (isset(self::$processedItems[$itemKey])) {
                 return;
             }
 
@@ -99,7 +112,6 @@ class AddFreeProduct implements ObserverInterface
 
                 $quote->addItem($freeItem);
                 
-                // 只在新增免费商品时显示消息
                 $this->messageManager->addSuccessMessage(
                     __('BOGO offer applied: Free %1 (worth %2) has been added!', 
                         $product->getName(),
@@ -109,6 +121,9 @@ class AddFreeProduct implements ObserverInterface
             }
 
             $quote->collectTotals();
+            
+            // 标记此商品已处理
+            self::$processedItems[$itemKey] = true;
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to add free BOGO product: ') . $e->getMessage());
         }
