@@ -15,7 +15,7 @@ class BogoManager
 {
     /**
      * Store processed items to prevent duplicate processing
-     * Key: quote_id_product_id
+     * Key: quote_id_product_id_item_id_qty
      * @var array
      */
     private static $processedItems = [];
@@ -83,13 +83,31 @@ class BogoManager
      */
     public function processBogoForItem(Quote $quote, Item $quoteItem): void
     {
+        // 生成唯一标识符
+        $processKey = sprintf(
+            '%s_%s_%s_%s',
+            $quote->getId(),
+            $quoteItem->getProductId(),
+            $quoteItem->getId(),
+            $quoteItem->getQty()
+        );
+
+        // 检查是否已经处理过
+        if (isset(self::$processedItems[$processKey])) {
+            $this->logger->debug('Item already processed', [
+                'process_key' => $processKey
+            ]);
+            return;
+        }
+
         $this->logger->debug('Processing BOGO for item', [
             'quote_id' => $quote->getId(),
             'item_id' => $quoteItem->getId(),
             'product_id' => $quoteItem->getProductId(),
             'qty' => $quoteItem->getQty(),
             'is_bogo_free' => $quoteItem->getData('is_bogo_free'),
-            'is_enabled' => $this->helper->isEnabled()
+            'is_enabled' => $this->helper->isEnabled(),
+            'process_key' => $processKey
         ]);
 
         if (!$this->helper->isEnabled() || $quoteItem->getData('is_bogo_free')) {
@@ -118,6 +136,9 @@ class BogoManager
 
             // 更新购物车中的BOGO商品
             $this->updateBogoItemsForProduct($quote, $quoteItem);
+            
+            // 标记为已处理
+            self::$processedItems[$processKey] = true;
             
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
