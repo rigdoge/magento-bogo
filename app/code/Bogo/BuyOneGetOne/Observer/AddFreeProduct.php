@@ -53,6 +53,10 @@ class AddFreeProduct implements ObserverInterface
             }
 
             $item = $observer->getEvent()->getData('quote_item');
+            if ($item->getData('is_bogo_free')) {
+                return; // 如果当前项目是免费商品，直接返回，避免重复处理
+            }
+
             $product = $item->getProduct();
             
             // Check if product is BOGO enabled
@@ -68,7 +72,16 @@ class AddFreeProduct implements ObserverInterface
             // Get the quantity of the paid product
             $paidQty = $item->getQty();
 
-            // Create free product item
+            // 移除所有已存在的相同产品的免费项
+            foreach ($quote->getAllItems() as $quoteItem) {
+                if ($quoteItem->getProduct()->getId() == $product->getId() 
+                    && $quoteItem->getData('is_bogo_free')
+                    && $quoteItem->getId() != $item->getId()) {
+                    $quote->removeItem($quoteItem->getId());
+                }
+            }
+
+            // 创建新的免费商品
             $freeItem = $this->itemFactory->create();
             $freeItem->setProduct($product)
                 ->setQuote($quote)
@@ -80,7 +93,12 @@ class AddFreeProduct implements ObserverInterface
             $quote->addItem($freeItem);
             $quote->collectTotals();
 
-            $this->messageManager->addSuccessMessage(__('Free product has been added to your cart.'));
+            $this->messageManager->addSuccessMessage(
+                __('BOGO offer applied: Free %1 (worth %2) has been added!', 
+                    $product->getName(),
+                    $product->getFormatedPrice()
+                )
+            );
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to add free BOGO product: ') . $e->getMessage());
         }
