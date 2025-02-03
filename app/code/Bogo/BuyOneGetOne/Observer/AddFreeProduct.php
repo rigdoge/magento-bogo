@@ -62,30 +62,37 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            // 先删除所有的免费商品
+            // 收集需要删除的项目ID
+            $itemsToRemove = [];
+            // 收集需要添加免费商品的项目
+            $itemsToAddFree = [];
+
+            // 第一次遍历：收集信息
             foreach ($quote->getAllItems() as $item) {
                 if ($item->getData('is_bogo_free')) {
-                    $quote->removeItem($item->getId());
+                    $itemsToRemove[] = $item->getId();
+                } else {
+                    $product = $item->getProduct();
+                    if ($product && $product->getData('buy_one_get_one')) {
+                        $itemsToAddFree[] = [
+                            'product' => $product,
+                            'qty' => $item->getQty()
+                        ];
+                    }
                 }
             }
 
-            // 重新添加免费商品
-            foreach ($quote->getAllItems() as $item) {
-                // 跳过已经是免费商品的项目
-                if ($item->getData('is_bogo_free')) {
-                    continue;
-                }
+            // 删除旧的免费商品
+            foreach ($itemsToRemove as $itemId) {
+                $quote->removeItem($itemId);
+            }
 
-                $product = $item->getProduct();
-                if (!$product || !$product->getData('buy_one_get_one')) {
-                    continue;
-                }
-
-                // 创建新的免费商品
+            // 添加新的免费商品
+            foreach ($itemsToAddFree as $item) {
                 $freeItem = $this->itemFactory->create();
-                $freeItem->setProduct($product)
+                $freeItem->setProduct($item['product'])
                     ->setQuote($quote)
-                    ->setQty($item->getQty())
+                    ->setQty($item['qty'])
                     ->setCustomPrice(0)
                     ->setOriginalCustomPrice(0)
                     ->setData('is_bogo_free', 1);
@@ -94,8 +101,8 @@ class AddFreeProduct implements ObserverInterface
                 
                 $this->messageManager->addSuccessMessage(
                     __('BOGO offer applied: Free %1 (worth %2) has been added!', 
-                        $product->getName(),
-                        $product->getFormatedPrice()
+                        $item['product']->getName(),
+                        $item['product']->getFormatedPrice()
                     )
                 );
             }
