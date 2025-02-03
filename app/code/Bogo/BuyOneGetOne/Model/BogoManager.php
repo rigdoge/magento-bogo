@@ -124,9 +124,11 @@ class BogoManager
     {
         try {
             $productId = $paidItem->getProductId();
-            $paidQty = $paidItem->getQty();
             
-            if ($paidQty > 1000) {
+            // 获取购物车中该商品的所有付费商品总数
+            $totalPaidQty = $this->getTotalPaidQtyForProduct($quote, $productId);
+            
+            if ($totalPaidQty > 1000) {
                 throw new LocalizedException(__('The quantity cannot exceed 1000.'));
             }
 
@@ -134,7 +136,7 @@ class BogoManager
             $freeItems = $this->getFreeItemsForProduct($quote, $productId);
             
             // 计算应该添加的免费商品数量
-            $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
+            $expectedFreeQty = $this->calculateExpectedFreeQty($totalPaidQty, $paidItem->getProduct());
             
             if (!empty($freeItems)) {
                 // 如果已经存在免费商品，更新第一个免费商品的数量，删除其他的
@@ -160,7 +162,7 @@ class BogoManager
 
             $this->logger->debug('Updated BOGO items', [
                 'product_id' => $productId,
-                'paid_qty' => $paidQty,
+                'total_paid_qty' => $totalPaidQty,
                 'free_qty' => $expectedFreeQty
             ]);
             
@@ -171,6 +173,29 @@ class BogoManager
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Get total paid quantity for a product in the cart
+     *
+     * @param Quote $quote
+     * @param int $productId
+     * @return float
+     */
+    private function getTotalPaidQtyForProduct(Quote $quote, $productId): float
+    {
+        $totalQty = 0;
+        foreach ($quote->getAllVisibleItems() as $item) {
+            if ($item->getProductId() == $productId && !$item->getData('is_bogo_free')) {
+                $totalQty += $item->getQty();
+                $this->logger->debug('Found paid item', [
+                    'item_id' => $item->getId(),
+                    'qty' => $item->getQty(),
+                    'running_total' => $totalQty
+                ]);
+            }
+        }
+        return $totalQty;
     }
 
     /**
