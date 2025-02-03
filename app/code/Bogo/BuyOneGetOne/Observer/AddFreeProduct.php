@@ -98,13 +98,17 @@ class AddFreeProduct implements ObserverInterface
                     ->setData('is_bogo_free', 1);
 
                 $quote->addItem($freeItem);
+                
+                // 只在新增免费商品时显示消息
+                $this->messageManager->addSuccessMessage(
+                    __('BOGO offer applied: Free %1 (worth %2) has been added!', 
+                        $product->getName(),
+                        $product->getFormatedPrice()
+                    )
+                );
             }
 
             $quote->collectTotals();
-
-            $this->messageManager->addSuccessMessage(
-                __('BOGO offer applied: Free %1 has been added!', $product->getName())
-            );
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to add free BOGO product: ') . $e->getMessage());
         }
