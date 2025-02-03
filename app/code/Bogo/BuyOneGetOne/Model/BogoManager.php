@@ -14,13 +14,6 @@ use Bogo\BuyOneGetOne\Logger\Logger;
 class BogoManager
 {
     /**
-     * Store processed items to prevent duplicate processing
-     * Key: quote_id_product_id_item_id_qty
-     * @var array
-     */
-    private static $processedItems = [];
-
-    /**
      * @var Data
      */
     private $helper;
@@ -83,31 +76,11 @@ class BogoManager
      */
     public function processBogoForItem(Quote $quote, Item $quoteItem): void
     {
-        // 生成唯一标识符
-        $processKey = sprintf(
-            '%s_%s_%s_%s',
-            $quote->getId(),
-            $quoteItem->getProductId(),
-            $quoteItem->getId(),
-            $quoteItem->getQty()
-        );
-
-        // 检查是否已经处理过
-        if (isset(self::$processedItems[$processKey])) {
-            $this->logger->debug('Item already processed', [
-                'process_key' => $processKey
-            ]);
-            return;
-        }
-
         $this->logger->debug('Processing BOGO for item', [
             'quote_id' => $quote->getId(),
             'item_id' => $quoteItem->getId(),
             'product_id' => $quoteItem->getProductId(),
-            'qty' => $quoteItem->getQty(),
-            'is_bogo_free' => $quoteItem->getData('is_bogo_free'),
-            'is_enabled' => $this->helper->isEnabled(),
-            'process_key' => $processKey
+            'qty' => $quoteItem->getQty()
         ]);
 
         if (!$this->helper->isEnabled() || $quoteItem->getData('is_bogo_free')) {
@@ -120,13 +93,7 @@ class BogoManager
         try {
             // 重新加载产品以确保所有属性都被加载
             $product = $this->productRepository->getById($quoteItem->getProductId());
-            $this->logger->debug('Checking product BOGO eligibility', [
-                'product_id' => $product->getId(),
-                'buy_one_get_one' => $product->getData('buy_one_get_one'),
-                'buy_one_get_one_value' => $product->getBuyOneGetOne(),
-                'all_attributes' => array_keys($product->getData())
-            ]);
-
+            
             if (!$product->getData('buy_one_get_one') && !$product->getBuyOneGetOne()) {
                 $this->logger->debug('Product is not BOGO eligible', [
                     'product_id' => $product->getId()
@@ -136,9 +103,6 @@ class BogoManager
 
             // 更新购物车中的BOGO商品
             $this->updateBogoItemsForProduct($quote, $quoteItem);
-            
-            // 标记为已处理
-            self::$processedItems[$processKey] = true;
             
         } catch (\Exception $e) {
             $this->logger->error('Error processing BOGO', [
@@ -160,41 +124,34 @@ class BogoManager
     {
         try {
             $productId = $paidItem->getProductId();
-            // 使用本次添加的商品数量
             $paidQty = $paidItem->getQty();
             
             if ($paidQty > 1000) {
                 throw new LocalizedException(__('The quantity cannot exceed 1000.'));
             }
-            
-            // 计算本次应该添加的免费商品数量
-            $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
-        
+
             // 获取当前的免费商品
             $freeItems = $this->getFreeItemsForProduct($quote, $productId);
             
-            // 如果已经存在免费商品，更新数量
+            // 计算应该添加的免费商品数量
+            $expectedFreeQty = $this->calculateExpectedFreeQty($paidQty, $paidItem->getProduct());
+            
             if (!empty($freeItems)) {
-                $freeItem = reset($freeItems); // 获取第一个免费商品
-                $currentFreeQty = $freeItem->getQty();
-                
-                // 累加免费商品数量
-                $newFreeQty = $currentFreeQty + $expectedFreeQty;
-                $freeItem->setQty($newFreeQty);
+                // 如果已经存在免费商品，更新第一个免费商品的数量，删除其他的
+                $freeItem = reset($freeItems);
+                $freeItem->setQty($expectedFreeQty);
                 
                 // 删除多余的免费商品
                 $count = 0;
                 foreach ($freeItems as $item) {
-                    if ($count++ > 0) { // 跳过第一个
+                    if ($count++ > 0) {
                         $quote->removeItem($item->getId());
                     }
                 }
                 
                 $this->logger->debug('Updated existing free item', [
                     'item_id' => $freeItem->getId(),
-                    'old_qty' => $currentFreeQty,
-                    'added_qty' => $expectedFreeQty,
-                    'new_qty' => $newFreeQty
+                    'new_qty' => $expectedFreeQty
                 ]);
             } else {
                 // 如果没有免费商品，创建新的
@@ -206,6 +163,7 @@ class BogoManager
                 'paid_qty' => $paidQty,
                 'free_qty' => $expectedFreeQty
             ]);
+            
         } catch (\Exception $e) {
             $this->logger->error('Error in updateBogoItemsForProduct', [
                 'error' => $e->getMessage(),
@@ -213,64 +171,6 @@ class BogoManager
             ]);
             throw $e;
         }
-    }
-
-    /**
-     * Get total paid quantity for a product
-     *
-     * @param Quote $quote
-     * @param int $productId
-     * @return float
-     */
-    private function getTotalPaidQtyForProduct(Quote $quote, $productId): float
-    {
-        $totalQty = 0;
-        $processedItems = [];
-        
-        // 获取购物车中的所有商品
-        $items = $quote->getAllVisibleItems();
-        
-        $this->logger->debug('Processing cart items', [
-            'quote_id' => $quote->getId(),
-            'total_items' => count($items),
-            'product_id' => $productId
-        ]);
-        
-        foreach ($items as $item) {
-            $this->logger->debug('Processing item', [
-                'item_id' => $item->getId(),
-                'product_id' => $item->getProductId(),
-                'qty' => $item->getQty(),
-                'is_bogo_free' => $item->getData('is_bogo_free'),
-                'processed' => in_array($item->getId(), $processedItems)
-            ]);
-            
-            if ($item->getProductId() == $productId && 
-                !$item->getData('is_bogo_free') && 
-                !in_array($item->getId(), $processedItems)
-            ) {
-                $totalQty += $item->getQty();
-                $processedItems[] = $item->getId();
-                
-                $this->logger->debug('Added item quantity', [
-                    'item_id' => $item->getId(),
-                    'qty' => $item->getQty(),
-                    'running_total' => $totalQty
-                ]);
-            } else {
-                $this->logger->debug('Skipped item', [
-                    'reason' => $item->getProductId() != $productId ? 'different_product' : 
-                              ($item->getData('is_bogo_free') ? 'is_free_item' : 
-                              (in_array($item->getId(), $processedItems) ? 'already_processed' : 'unknown'))
-                ]);
-            }
-        }
-        $this->logger->debug('Calculated total paid quantity', [
-            'product_id' => $productId,
-            'total_qty' => $totalQty,
-            'quote_id' => $quote->getId()
-        ]);
-        return $totalQty;
     }
 
     /**
@@ -357,12 +257,7 @@ class BogoManager
         $this->logger->debug('Creating free item', [
             'quote_id' => $quote->getId(),
             'product_id' => $paidItem->getProduct()->getId(),
-            'qty' => $freeQty,
-            'price' => $freeItem->getPrice(),
-            'base_price' => $freeItem->getBasePrice(),
-            'custom_price' => $freeItem->getCustomPrice(),
-            'row_total' => $freeItem->getRowTotal(),
-            'tax_amount' => $freeItem->getTaxAmount()
+            'qty' => $freeQty
         ]);
 
         $quote->addItem($freeItem);
