@@ -52,53 +52,55 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            $item = $observer->getEvent()->getData('quote_item');
-            if ($item->getData('is_bogo_free')) {
-                return; // 如果当前项目是免费商品，直接返回，避免重复处理
-            }
-
-            $product = $item->getProduct();
-            
-            // Check if product is BOGO enabled
-            if (!$product->getData('buy_one_get_one')) {
+            $cart = $observer->getEvent()->getCart();
+            if (!$cart) {
                 return;
             }
 
-            $quote = $item->getQuote();
+            $quote = $cart->getQuote();
             if (!$quote) {
                 return;
             }
 
-            // Get the quantity of the paid product
-            $paidQty = $item->getQty();
-
-            // 移除所有已存在的相同产品的免费项
-            foreach ($quote->getAllItems() as $quoteItem) {
-                if ($quoteItem->getProduct()->getId() == $product->getId() 
-                    && $quoteItem->getData('is_bogo_free')
-                    && $quoteItem->getId() != $item->getId()) {
-                    $quote->removeItem($quoteItem->getId());
+            // 先删除所有的免费商品
+            foreach ($quote->getAllItems() as $item) {
+                if ($item->getData('is_bogo_free')) {
+                    $quote->removeItem($item->getId());
                 }
             }
 
-            // 创建新的免费商品
-            $freeItem = $this->itemFactory->create();
-            $freeItem->setProduct($product)
-                ->setQuote($quote)
-                ->setQty($paidQty)
-                ->setCustomPrice(0)
-                ->setOriginalCustomPrice(0)
-                ->setData('is_bogo_free', 1);
+            // 重新添加免费商品
+            foreach ($quote->getAllItems() as $item) {
+                // 跳过已经是免费商品的项目
+                if ($item->getData('is_bogo_free')) {
+                    continue;
+                }
 
-            $quote->addItem($freeItem);
+                $product = $item->getProduct();
+                if (!$product || !$product->getData('buy_one_get_one')) {
+                    continue;
+                }
+
+                // 创建新的免费商品
+                $freeItem = $this->itemFactory->create();
+                $freeItem->setProduct($product)
+                    ->setQuote($quote)
+                    ->setQty($item->getQty())
+                    ->setCustomPrice(0)
+                    ->setOriginalCustomPrice(0)
+                    ->setData('is_bogo_free', 1);
+
+                $quote->addItem($freeItem);
+                
+                $this->messageManager->addSuccessMessage(
+                    __('BOGO offer applied: Free %1 (worth %2) has been added!', 
+                        $product->getName(),
+                        $product->getFormatedPrice()
+                    )
+                );
+            }
+
             $quote->collectTotals();
-
-            $this->messageManager->addSuccessMessage(
-                __('BOGO offer applied: Free %1 (worth %2) has been added!', 
-                    $product->getName(),
-                    $product->getFormatedPrice()
-                )
-            );
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__('Unable to add free BOGO product: ') . $e->getMessage());
         }
