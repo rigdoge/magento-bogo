@@ -88,21 +88,25 @@ class CartItemPlugin
                 return $result;
             }
 
+            // 获取本次新增的数量
+            $newQty = $result->getQty();
+            $origQty = $result->getOrigData('qty');
+            
+            // 只在首次添加或增加数量时处理
+            if ($origQty) {
+                if ($newQty <= $origQty) {
+                    return $result;
+                }
+                $newQty = $newQty - $origQty;
+            }
+
             $this->logger->debug('Processing BOGO for saved item', [
                 'item_id' => $result->getId(),
                 'product_id' => $result->getProductId(),
-                'qty' => $result->getQty()
+                'orig_qty' => $origQty,
+                'new_qty' => $newQty,
+                'total_qty' => $result->getQty()
             ]);
-
-            // 获取本次新增的数量
-            $newQty = $result->getQty();
-            if ($result->getOrigData('qty')) {
-                $newQty = $result->getQty() - $result->getOrigData('qty');
-            }
-
-            if ($newQty <= 0) {
-                return $result;
-            }
 
             $quote = $result->getQuote();
             $this->addFreeItem($quote, $result, $newQty);
@@ -148,6 +152,13 @@ class CartItemPlugin
             if ($existingFreeItem) {
                 // 更新现有免费商品的数量，增加本次新增的免费数量
                 $newFreeQty = $existingFreeItem->getQty() + $freeQty;
+                
+                // 检查是否超过最大限制
+                $maxFree = $this->helper->getMaxFreeItems();
+                if ($maxFree > 0 && $newFreeQty > $maxFree) {
+                    $newFreeQty = $maxFree;
+                }
+                
                 $existingFreeItem->setQty($newFreeQty);
                 $existingFreeItem->save();
                 
@@ -155,7 +166,8 @@ class CartItemPlugin
                     'item_id' => $existingFreeItem->getId(),
                     'orig_qty' => $existingFreeItem->getQty(),
                     'new_qty' => $newFreeQty,
-                    'added_qty' => $freeQty
+                    'added_qty' => $freeQty,
+                    'max_free' => $maxFree
                 ]);
             } else {
                 // 创建新的免费商品
