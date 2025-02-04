@@ -94,8 +94,18 @@ class CartItemPlugin
                 'qty' => $result->getQty()
             ]);
 
+            // 获取本次新增的数量
+            $newQty = $result->getQty();
+            if ($result->getOrigData('qty')) {
+                $newQty = $result->getQty() - $result->getOrigData('qty');
+            }
+
+            if ($newQty <= 0) {
+                return $result;
+            }
+
             $quote = $result->getQuote();
-            $this->addFreeItem($quote, $result);
+            $this->addFreeItem($quote, $result, $newQty);
 
         } catch (\Exception $e) {
             $this->logger->error('Error in BOGO plugin', [
@@ -112,14 +122,14 @@ class CartItemPlugin
      *
      * @param \Magento\Quote\Model\Quote $quote
      * @param Item $paidItem
+     * @param float $newQty
      * @return void
      */
-    private function addFreeItem($quote, $paidItem)
+    private function addFreeItem($quote, $paidItem, $newQty)
     {
         try {
-            // 计算免费商品数量
-            $paidQty = $paidItem->getQty();
-            $freeQty = $this->calculateFreeQty($paidQty, $paidItem->getProduct());
+            // 计算本次新增的免费商品数量
+            $freeQty = $this->calculateFreeQty($newQty, $paidItem->getProduct());
 
             if ($freeQty <= 0) {
                 return;
@@ -136,13 +146,16 @@ class CartItemPlugin
             }
 
             if ($existingFreeItem) {
-                // 更新现有免费商品的数量
-                $existingFreeItem->setQty($freeQty);
+                // 更新现有免费商品的数量，增加本次新增的免费数量
+                $newFreeQty = $existingFreeItem->getQty() + $freeQty;
+                $existingFreeItem->setQty($newFreeQty);
                 $existingFreeItem->save();
                 
                 $this->logger->debug('Updated existing free item', [
                     'item_id' => $existingFreeItem->getId(),
-                    'new_qty' => $freeQty
+                    'orig_qty' => $existingFreeItem->getQty(),
+                    'new_qty' => $newFreeQty,
+                    'added_qty' => $freeQty
                 ]);
             } else {
                 // 创建新的免费商品
