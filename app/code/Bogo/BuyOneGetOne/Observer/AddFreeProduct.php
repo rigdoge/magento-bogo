@@ -82,7 +82,12 @@ class AddFreeProduct implements ObserverInterface
 
             /** @var Item $quoteItem */
             $quoteItem = $observer->getEvent()->getData('quote_item');
-            if (!$quoteItem || $quoteItem->getData('is_bogo_free')) {
+            if (!$quoteItem) {
+                return;
+            }
+
+            // 检查是否是免费商品或者正在处理中
+            if ($quoteItem->getData('is_bogo_free') || $quoteItem->getData('processing_bogo')) {
                 return;
             }
 
@@ -97,14 +102,24 @@ class AddFreeProduct implements ObserverInterface
                 'qty' => $quoteItem->getQty()
             ]);
 
+            // 标记为正在处理
+            $quoteItem->setData('processing_bogo', true);
+
             $quote = $quoteItem->getQuote();
             $this->addFreeItem($quote, $quoteItem);
+
+            // 移除处理标记
+            $quoteItem->unsetData('processing_bogo');
 
         } catch (\Exception $e) {
             $this->logger->error('Error in BOGO observer', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            // 确保移除处理标记
+            if (isset($quoteItem)) {
+                $quoteItem->unsetData('processing_bogo');
+            }
         }
     }
 
@@ -127,7 +142,7 @@ class AddFreeProduct implements ObserverInterface
 
             // 检查是否已存在免费商品
             $existingFreeItem = null;
-            foreach ($quote->getAllItems() as $item) {
+            foreach ($quote->getAllVisibleItems() as $item) {
                 if ($item->getData('is_bogo_free') && 
                     $item->getProductId() == $paidItem->getProductId()) {
                     $existingFreeItem = $item;
