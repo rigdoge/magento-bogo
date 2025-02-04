@@ -80,47 +80,180 @@ class AddFreeProduct implements ObserverInterface
                 return;
             }
 
-            /** @var Item $quoteItem */
-            $quoteItem = $observer->getEvent()->getData('quote_item');
-            if (!$quoteItem) {
-                return;
-            }
-
-            // 检查是否是免费商品或者正在处理中
-            if ($quoteItem->getData('is_bogo_free') || $quoteItem->getData('processing_bogo')) {
-                return;
-            }
-
-            $product = $quoteItem->getProduct();
-            if (!$product->getData('buy_one_get_one') && !$product->getBuyOneGetOne()) {
-                return;
-            }
-
-            $this->logger->debug('Processing BOGO for added item', [
-                'item_id' => $quoteItem->getId(),
-                'product_id' => $quoteItem->getProductId(),
-                'qty' => $quoteItem->getQty()
+            $eventName = $observer->getEvent()->getName();
+            $this->logger->debug('Processing BOGO event', [
+                'event_name' => $eventName
             ]);
 
-            // 标记为正在处理
-            $quoteItem->setData('processing_bogo', true);
-
-            $quote = $quoteItem->getQuote();
-            $this->addFreeItem($quote, $quoteItem);
-
-            // 移除处理标记
-            $quoteItem->unsetData('processing_bogo');
+            switch ($eventName) {
+                case 'checkout_cart_product_add_after':
+                    $this->handleProductAdd($observer);
+                    break;
+                case 'checkout_cart_update_items_after':
+                    $this->handleCartUpdate($observer);
+                    break;
+                case 'sales_quote_remove_item':
+                    $this->handleItemRemove($observer);
+                    break;
+            }
 
         } catch (\Exception $e) {
             $this->logger->error('Error in BOGO observer', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            // 确保移除处理标记
-            if (isset($quoteItem)) {
-                $quoteItem->unsetData('processing_bogo');
+        }
+    }
+
+    /**
+     * Handle product add event
+     *
+     * @param Observer $observer
+     * @return void
+     */
+    private function handleProductAdd(Observer $observer)
+    {
+        /** @var Item $quoteItem */
+        $quoteItem = $observer->getEvent()->getData('quote_item');
+        if (!$quoteItem || $quoteItem->getData('is_bogo_free')) {
+            return;
+        }
+
+        $product = $quoteItem->getProduct();
+        if (!$product->getData('buy_one_get_one') && !$product->getBuyOneGetOne()) {
+            return;
+        }
+
+        $this->logger->debug('Processing BOGO for added item', [
+            'item_id' => $quoteItem->getId(),
+            'product_id' => $quoteItem->getProductId(),
+            'qty' => $quoteItem->getQty()
+        ]);
+
+        $quote = $quoteItem->getQuote();
+        $this->addFreeItem($quote, $quoteItem);
+    }
+
+    /**
+     * Handle cart update event
+     *
+     * @param Observer $observer
+     * @return void
+     */
+    private function handleCartUpdate(Observer $observer)
+    {
+        /** @var \Magento\Quote\Model\Quote $quote */
+        $quote = $observer->getEvent()->getData('quote');
+        if (!$quote) {
+            return;
+        }
+
+        $this->logger->debug('Processing cart update');
+        $this->syncAllFreeItems($quote);
+    }
+
+    /**
+     * Handle item remove event
+     *
+     * @param Observer $observer
+     * @return void
+     */
+    private function handleItemRemove(Observer $observer)
+    {
+        /** @var Item $quoteItem */
+        $quoteItem = $observer->getEvent()->getData('quote_item');
+        if (!$quoteItem) {
+            return;
+        }
+
+        $quote = $quoteItem->getQuote();
+        if ($quoteItem->getData('is_bogo_free')) {
+            return;
+        }
+
+        $this->logger->debug('Processing item remove', [
+            'item_id' => $quoteItem->getId(),
+            'product_id' => $quoteItem->getProductId()
+        ]);
+
+        // 删除对应的免费商品
+        foreach ($quote->getAllItems() as $item) {
+            if ($item->getData('is_bogo_free') && 
+                $item->getProductId() == $quoteItem->getProductId()) {
+                $quote->removeItem($item->getId());
+                $this->logger->debug('Removed free item', [
+                    'item_id' => $item->getId()
+                ]);
+                break;
             }
         }
+    }
+
+    /**
+     * Sync all free items in cart
+     *
+     * @param \Magento\Quote\Model\Quote $quote
+     * @return void
+     */
+    private function syncAllFreeItems($quote)
+    {
+        $bogoItems = [];
+        $freeItems = [];
+
+        // 收集所有 BOGO 商品和免费商品
+        foreach ($quote->getAllVisibleItems() as $item) {
+            if ($item->getData('is_bogo_free')) {
+                $freeItems[$item->getProductId()][] = $item;
+            } else {
+                $product = $item->getProduct();
+                if ($product->getData('buy_one_get_one') || $product->getBuyOneGetOne()) {
+                    if (!isset($bogoItems[$item->getProductId()])) {
+                        $bogoItems[$item->getProductId()] = [
+                            'qty' => 0,
+                            'product' => $product
+                        ];
+                    }
+                    $bogoItems[$item->getProductId()]['qty'] += $item->getQty();
+                }
+            }
+        }
+
+        // 更新或删除免费商品
+        foreach ($bogoItems as $productId => $data) {
+            $freeQty = $this->calculateFreeQty($data['qty'], $data['product']);
+            
+            if (isset($freeItems[$productId])) {
+                $existingFreeItem = reset($freeItems[$productId]);
+                if ($freeQty > 0) {
+                    $existingFreeItem->setQty($freeQty);
+                    // 删除多余的免费商品
+                    foreach ($freeItems[$productId] as $index => $item) {
+                        if ($index > 0) {
+                            $quote->removeItem($item->getId());
+                        }
+                    }
+                } else {
+                    // 如果不需要免费商品，删除所有免费商品
+                    foreach ($freeItems[$productId] as $item) {
+                        $quote->removeItem($item->getId());
+                    }
+                }
+            } elseif ($freeQty > 0) {
+                // 创建新的免费商品
+                $this->addFreeItem($quote, reset($quote->getItemsCollection()->getItemsByColumnValue('product_id', $productId)));
+            }
+        }
+
+        // 删除没有对应付费商品的免费商品
+        foreach ($freeItems as $productId => $items) {
+            if (!isset($bogoItems[$productId])) {
+                foreach ($items as $item) {
+                    $quote->removeItem($item->getId());
+                }
+            }
+        }
+
+        $quote->collectTotals()->save();
     }
 
     /**
@@ -152,23 +285,11 @@ class AddFreeProduct implements ObserverInterface
 
             if ($existingFreeItem) {
                 // 更新现有免费商品的数量
-                $newFreeQty = $existingFreeItem->getQty() + $freeQty;
-                
-                // 检查是否超过最大限制
-                $maxFree = $this->helper->getMaxFreeItems();
-                if ($maxFree > 0 && $newFreeQty > $maxFree) {
-                    $newFreeQty = $maxFree;
-                }
-                
-                $existingFreeItem->setQty($newFreeQty);
-                $existingFreeItem->save();
+                $existingFreeItem->setQty($freeQty);
                 
                 $this->logger->debug('Updated existing free item', [
                     'item_id' => $existingFreeItem->getId(),
-                    'orig_qty' => $existingFreeItem->getQty(),
-                    'new_qty' => $newFreeQty,
-                    'added_qty' => $freeQty,
-                    'max_free' => $maxFree
+                    'new_qty' => $freeQty
                 ]);
             } else {
                 // 创建新的免费商品
@@ -209,9 +330,6 @@ class AddFreeProduct implements ObserverInterface
                     )
                 );
             }
-
-            // 保存购物车
-            $quote->collectTotals()->save();
 
         } catch (\Exception $e) {
             $this->logger->error('Error adding free item', [

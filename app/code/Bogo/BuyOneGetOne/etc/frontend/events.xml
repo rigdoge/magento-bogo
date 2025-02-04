@@ -5,4 +5,12 @@
         <observer name="bogo_add_free_product"
                  instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct"/>
     </event>
+    <event name="checkout_cart_update_items_after">
+        <observer name="bogo_update_free_product"
+                 instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct"/>
+    </event>
+    <event name="sales_quote_remove_item">
+        <observer name="bogo_remove_free_product"
+                 instance="Bogo\BuyOneGetOne\Observer\AddFreeProduct"/>
+    </event>
 </config> 
