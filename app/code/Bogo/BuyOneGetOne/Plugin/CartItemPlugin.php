@@ -88,28 +88,42 @@ class CartItemPlugin
                 return $result;
             }
 
-            // 获取本次新增的数量
-            $newQty = $result->getQty();
-            $origQty = $result->getOrigData('qty');
+            // 检查商品状态
+            $isNewItem = !$result->getOrigData('item_id');
+            $origQty = (float)$result->getOrigData('qty');
+            $newQty = (float)$result->getQty();
             
-            // 只在首次添加或增加数量时处理
-            if ($origQty) {
-                if ($newQty <= $origQty) {
-                    return $result;
-                }
-                $newQty = $newQty - $origQty;
+            // 如果不是新商品且数量没有增加，则不处理
+            if (!$isNewItem && $newQty <= $origQty) {
+                return $result;
             }
+
+            // 计算需要添加的免费商品数量
+            $addQty = $isNewItem ? $newQty : ($newQty - $origQty);
 
             $this->logger->debug('Processing BOGO for saved item', [
                 'item_id' => $result->getId(),
                 'product_id' => $result->getProductId(),
+                'is_new_item' => $isNewItem,
                 'orig_qty' => $origQty,
                 'new_qty' => $newQty,
-                'total_qty' => $result->getQty()
+                'add_qty' => $addQty
             ]);
 
             $quote = $result->getQuote();
-            $this->addFreeItem($quote, $result, $newQty);
+            
+            // 如果是新商品，先检查是否已存在相同商品的免费项
+            if ($isNewItem) {
+                $existingFreeItem = $this->findExistingFreeItem($quote, $result->getProductId());
+                if ($existingFreeItem) {
+                    $this->logger->debug('Found existing free item for new paid item', [
+                        'free_item_id' => $existingFreeItem->getId(),
+                        'free_item_qty' => $existingFreeItem->getQty()
+                    ]);
+                }
+            }
+            
+            $this->addFreeItem($quote, $result, $addQty);
 
         } catch (\Exception $e) {
             $this->logger->error('Error in BOGO plugin', [
@@ -122,32 +136,43 @@ class CartItemPlugin
     }
 
     /**
+     * Find existing free item in quote
+     *
+     * @param \Magento\Quote\Model\Quote $quote
+     * @param int $productId
+     * @return Item|null
+     */
+    private function findExistingFreeItem($quote, $productId)
+    {
+        foreach ($quote->getAllItems() as $item) {
+            if ($item->getData('is_bogo_free') && 
+                $item->getProductId() == $productId) {
+                return $item;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Add free item to quote
      *
      * @param \Magento\Quote\Model\Quote $quote
      * @param Item $paidItem
-     * @param float $newQty
+     * @param float $addQty
      * @return void
      */
-    private function addFreeItem($quote, $paidItem, $newQty)
+    private function addFreeItem($quote, $paidItem, $addQty)
     {
         try {
             // 计算本次新增的免费商品数量
-            $freeQty = $this->calculateFreeQty($newQty, $paidItem->getProduct());
+            $freeQty = $this->calculateFreeQty($addQty, $paidItem->getProduct());
 
             if ($freeQty <= 0) {
                 return;
             }
 
             // 检查是否已存在免费商品
-            $existingFreeItem = null;
-            foreach ($quote->getAllItems() as $item) {
-                if ($item->getData('is_bogo_free') && 
-                    $item->getProductId() == $paidItem->getProductId()) {
-                    $existingFreeItem = $item;
-                    break;
-                }
-            }
+            $existingFreeItem = $this->findExistingFreeItem($quote, $paidItem->getProductId());
 
             if ($existingFreeItem) {
                 // 更新现有免费商品的数量，增加本次新增的免费数量
@@ -160,7 +185,6 @@ class CartItemPlugin
                 }
                 
                 $existingFreeItem->setQty($newFreeQty);
-                $existingFreeItem->save();
                 
                 $this->logger->debug('Updated existing free item', [
                     'item_id' => $existingFreeItem->getId(),
